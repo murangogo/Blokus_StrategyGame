@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://battle.azuki.top/api'
-  : '/api';
+  ? 'https://gameapi.azuki.top'
+  : '/';
 
 // 创建axios实例
 const api = axios.create({
