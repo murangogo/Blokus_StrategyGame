@@ -22,8 +22,8 @@ function Home() {
   // 创建房间
   const handleCreateRoom = async () => {
     const time = parseInt(limitTime);
-    if (isNaN(time) || time < 10 || time > 3600) {
-      setError('请输入有效的时间（10-3600秒）');
+    if (isNaN(time) || time < 60 || time > 300) {
+      setError('请输入有效的时间（60-300秒）');
       return;
     }
 
@@ -35,6 +35,11 @@ function Home() {
       
       if (response.data.success) {
         const roomId = response.data.data.roomId;
+
+        console.log(response);
+        
+        console.log(roomId);
+
         setCreatedRoomId(roomId);
         setCreateModalOpen(false);
         setResultModalOpen(true);
