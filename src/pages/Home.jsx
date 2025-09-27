@@ -34,7 +34,7 @@ function Home() {
       const response = await gameAPI.createRoom(time);
       
       if (response.data.success) {
-        const roomId = response.data.data.roomId;
+        const roomId = response.data.data.roomId_create;
 
         console.log(response);
         

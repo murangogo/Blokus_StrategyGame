@@ -1,606 +1,540 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getUser } from '../utils/auth';
 import { gameAPI } from '../services/api';
-import { PIECES, getPieceTransforms, isOutOfBounds, isOverlapping, isValidPlacement } from '../constants/pieces';
-import Toast from '../components/Toast';
+import { useWebSocket } from '../hooks/useWebSocket';
+import {
+  PIECES,
+  getPieceTransforms,
+  isOutOfBounds,
+  isOverlapping,
+  isValidPlacement,
+  placePieceOnBoard,
+  countPlayerSquares,
+  getPlayerId
+} from '../utils/pieces';
+
+const TRANSFORM_STATES = [
+  { rotation: 0, flipped: false, label: '原始' },
+  { rotation: 1, flipped: false, label: '旋转90°' },
+  { rotation: 2, flipped: false, label: '旋转180°' },
+  { rotation: 3, flipped: false, label: '旋转270°' },
+  { rotation: 0, flipped: true, label: '翻转' },
+  { rotation: 1, flipped: true, label: '翻转+90°' },
+  { rotation: 2, flipped: true, label: '翻转+180°' },
+  { rotation: 3, flipped: true, label: '翻转+270°' },
+];
 
 function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const user = getUser();
-  const wsRef = useRef(null);
-  const reconnectTimerRef = useRef(null);
-  const timerRef = useRef(null);
-  
+
   // 游戏状态
-  const [gameState, setGameState] = useState(null);
-  const [board, setBoard] = useState(Array(14).fill(null).map(() => Array(14).fill(0)));
-  const [myRole, setMyRole] = useState(null);
+  const [gameStatus, setGameStatus] = useState('等待加入'); // 等待加入/游戏中/游戏结束
+  const [board, setBoard] = useState(Array(14).fill().map(() => Array(14).fill(0)));
+  const [myRole, setMyRole] = useState(null); // creator/joiner
+  const [players, setPlayers] = useState({ creator: null, joiner: null });
   const [currentPlayer, setCurrentPlayer] = useState('creator');
-  
-  // 棋子选择状态
-  const [selectedPiece, setSelectedPiece] = useState(null);
-  const [rotation, setRotation] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [previewPos, setPreviewPos] = useState(null);
-  const [usedPieces, setUsedPieces] = useState({
-    creator: Array(21).fill(false),
-    joiner: Array(21).fill(false)
-  });
-  
-  // 计时器状态
+  const [myPieces, setMyPieces] = useState(Array(21).fill(false));
+  const [opponentPieces, setOpponentPieces] = useState(Array(21).fill(false));
+  const [myPenalty, setMyPenalty] = useState(0);
+  const [opponentPenalty, setOpponentPenalty] = useState(0);
+  const [myBackupTime, setMyBackupTime] = useState(300);
+  const [opponentBackupTime, setOpponentBackupTime] = useState(300);
   const [limitTime, setLimitTime] = useState(60);
-  const [backupTime, setBackupTime] = useState({ creator: 300, joiner: 300 });
-  const [currentTime, setCurrentTime] = useState(60);
-  const [roundStartTime, setRoundStartTime] = useState(null);
+  const [roundStartTime, setRoundStartTime] = useState(Date.now());
+  const [lastMove, setLastMove] = useState(null); // 记录最后一步棋
   
   // UI状态
+  const [selectedPiece, setSelectedPiece] = useState(null);
+  const [transformIndex, setTransformIndex] = useState(0);
+  const [previewPosition, setPreviewPosition] = useState(null);
+  const [confirmedPosition, setConfirmedPosition] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-  const [gameStatus, setGameStatus] = useState('waiting');
-  const [isPassed, setIsPassed] = useState(false);
-  const [gameResult, setGameResult] = useState(null);
-  const [wsConnected, setWsConnected] = useState(false);
 
-  // 显示Toast
-  const showToast = useCallback((message, type = 'error') => {
-    setToast({ message, type });
-  }, []);
+  // WebSocket连接
+  const { connected, sendMessage } = useWebSocket(roomId, handleWebSocketMessage);
 
-  // 获取游戏状态
+  // 计算我的playerId
+  const myPlayerId = useMemo(() => {
+    return myRole ? getPlayerId(myRole) : null;
+  }, [myRole]);
+
+  // 计算当前变换后的棋子形状
+  const currentShape = useMemo(() => {
+    if (selectedPiece === null) return null;
+    const transform = TRANSFORM_STATES[transformIndex];
+    return getPieceTransforms(selectedPiece, transform.rotation, transform.flipped);
+  }, [selectedPiece, transformIndex]);
+
+  // 计算我的格数
+  const mySquares = useMemo(() => {
+    return countPlayerSquares(board, myPlayerId);
+  }, [board, myPlayerId]);
+
+  // 计算对方格数
+  const opponentSquares = useMemo(() => {
+    const opponentId = myPlayerId === 1 ? 2 : 1;
+    return countPlayerSquares(board, opponentId);
+  }, [board, myPlayerId]);
+
+  // 是否是我的回合
+  const isMyTurn = currentPlayer === myRole && gameStatus === '游戏中';
+
+  // 是否是第一步
+  const isFirstMove = useMemo(() => {
+    return myPieces.every(used => !used);
+  }, [myPieces]);
+
+  // 获取游戏初始状态
   useEffect(() => {
     const fetchGameState = async () => {
       try {
         const response = await gameAPI.getState(roomId);
         if (response.data.success) {
           const state = response.data.state;
-          setGameState(state);
-          setGameStatus(state.config?.gameStatus || 'waiting');
+          
+          // 判断我的角色
+          const role = state.players.creator.userId === user.userId ? 'creator' : 'joiner';
+          setMyRole(role);
+          
+          // 设置玩家信息
+          setPlayers(state.players);
+          
+          // 设置游戏状态
+          setBoard(state.board?.board || Array(14).fill().map(() => Array(14).fill(0)));
+          setCurrentPlayer(state.progress?.currentPlayer || 'creator');
           setLimitTime(state.config?.limitTime || 60);
+          setRoundStartTime(state.progress?.roundStartTime || Date.now());
           
-          if (state.players?.creator?.userId === user.userId) {
-            setMyRole('creator');
-          } else if (state.players?.joiner?.userId === user.userId) {
-            setMyRole('joiner');
+          // 设置棋子使用情况
+          if (role === 'creator') {
+            setMyPieces(state.creator?.pieces || Array(21).fill(false));
+            setOpponentPieces(state.joiner?.pieces || Array(21).fill(false));
+            setMyPenalty(state.creator?.penalty || 0);
+            setOpponentPenalty(state.joiner?.penalty || 0);
+            setMyBackupTime(state.creator?.backupTime || 300);
+            setOpponentBackupTime(state.joiner?.backupTime || 300);
+          } else {
+            setMyPieces(state.joiner?.pieces || Array(21).fill(false));
+            setOpponentPieces(state.creator?.pieces || Array(21).fill(false));
+            setMyPenalty(state.joiner?.penalty || 0);
+            setOpponentPenalty(state.creator?.penalty || 0);
+            setMyBackupTime(state.joiner?.backupTime || 300);
+            setOpponentBackupTime(state.creator?.backupTime || 300);
           }
           
-          if (state.board?.board) {
-            setBoard(state.board.board);
+          // 设置游戏状态
+          if (!state.players.joiner) {
+            setGameStatus('等待加入');
+          } else if (state.config?.gameStatus === 'playing') {
+            setGameStatus('游戏中');
+          } else if (state.config?.gameStatus === 'finished') {
+            setGameStatus('游戏结束');
           }
-          
-          if (state.creator && state.joiner) {
-            setUsedPieces({
-              creator: state.creator.pieces || Array(21).fill(false),
-              joiner: state.joiner.pieces || Array(21).fill(false)
-            });
-            setBackupTime({
-              creator: state.creator.backupTime || 300,
-              joiner: state.joiner.backupTime || 300
-            });
-            setIsPassed(state[myRole]?.passed || false);
-          }
-          
-          if (state.progress) {
-            setCurrentPlayer(state.progress.currentPlayer);
-            setRoundStartTime(state.progress.roundStartTime);
-          }
-          
-          setLoading(false);
         }
-      } catch (err) {
-        console.error('Fetch state error:', err);
-        showToast('获取房间状态失败');
+      } catch (error) {
+        console.error('获取游戏状态失败:', error);
+      } finally {
         setLoading(false);
       }
     };
-    
+
     fetchGameState();
-  }, [roomId, user.userId, showToast]);
-
-  // WebSocket连接
-  const connectWebSocket = useCallback(() => {
-    if (!myRole) return;
-    
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.PROD 
-      ? 'battle.azuki.top'
-      : window.location.host;
-    const wsUrl = `${protocol}//${host}/api/game/connect/${roomId}?playerId=${user.userId}`;
-    
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-    
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      setWsConnected(true);
-      showToast('已连接到游戏服务器', 'success');
-    };
-    
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      handleWebSocketMessage(data);
-    };
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setWsConnected(false);
-    };
-    
-    ws.onclose = () => {
-      console.log('WebSocket closed');
-      setWsConnected(false);
-      
-      // 5秒后自动重连
-      reconnectTimerRef.current = setTimeout(() => {
-        showToast('正在重新连接...', 'info');
-        connectWebSocket();
-      }, 5000);
-    };
-  }, [myRole, roomId, user.userId, showToast]);
-
-  useEffect(() => {
-    connectWebSocket();
-    
-    return () => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.close();
-      }
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-      }
-    };
-  }, [connectWebSocket]);
-
-  // 计时器逻辑
-  useEffect(() => {
-    if (gameStatus !== 'playing' || !roundStartTime) return;
-    
-    const updateTimer = () => {
-      const elapsed = Math.floor((Date.now() - roundStartTime) / 1000);
-      const remaining = limitTime - elapsed;
-      
-      if (remaining > 0) {
-        setCurrentTime(remaining);
-      } else {
-        // 开始使用backup time
-        const backupRemaining = backupTime[currentPlayer] - (elapsed - limitTime);
-        if (backupRemaining > 0) {
-          setCurrentTime(0);
-          setBackupTime(prev => ({
-            ...prev,
-            [currentPlayer]: backupRemaining
-          }));
-        } else {
-          setCurrentTime(0);
-          setBackupTime(prev => ({
-            ...prev,
-            [currentPlayer]: 0
-          }));
-          // TODO: 触发超时惩罚
-        }
-      }
-    };
-    
-    timerRef.current = setInterval(updateTimer, 1000);
-    
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [gameStatus, roundStartTime, limitTime, currentPlayer, backupTime]);
+  }, [roomId, user]);
 
   // 处理WebSocket消息
-  const handleWebSocketMessage = (data) => {
+  function handleWebSocketMessage(data) {
     switch (data.type) {
       case 'game_state':
-        setGameState(data);
-        setGameStatus(data.config?.gameStatus);
-        if (data.progress) {
-          setCurrentPlayer(data.progress.currentPlayer);
-          setRoundStartTime(data.progress.roundStartTime);
-          setCurrentTime(data.config?.limitTime || 60);
+        // 初始游戏状态（连接时发送）
+        // 已在useEffect中处理
+        break;
+
+      case 'player_joined':
+        setPlayers(prev => ({
+          ...prev,
+          joiner: data.joiner
+        }));
+        if (myRole === 'creator') {
+          setGameStatus('等待开始');
         }
         break;
-        
-      case 'player_joined':
-        setGameState(prev => ({
-          ...prev,
-          players: { ...prev.players, joiner: data.joiner }
-        }));
-        showToast('对手已加入', 'success');
-        break;
-        
+
       case 'game_started':
-        setGameStatus('playing');
+        setGameStatus('游戏中');
         setCurrentPlayer(data.currentPlayer);
-        setRoundStartTime(Date.now());
-        setCurrentTime(limitTime);
-        showToast('游戏开始！', 'success');
         break;
-        
+
       case 'move_made':
-        setBoard(data.board || board);
+        // 对方下棋
+        setBoard(data.boardState || board);
         setCurrentPlayer(data.nextPlayer);
         setRoundStartTime(Date.now());
-        setCurrentTime(limitTime);
-        setUsedPieces(prev => ({
-          ...prev,
-          [data.player]: [...prev[data.player]].map((used, i) => 
-            i === data.pieceIndex ? true : used
-          )
-        }));
-        setSelectedPiece(null);
-        setPreviewPos(null);
-        setRotation(0);
-        setFlipped(false);
-        break;
+        setLastMove({
+          player: data.player,
+          pieceIndex: data.pieceIndex,
+          position: data.position
+        });
         
-      case 'player_passed':
-        if (data.player === myRole) {
-          setIsPassed(true);
-          showToast('你已停手', 'info');
+        // 更新对方棋子状态
+        if (data.player !== myRole) {
+          setOpponentPieces(prev => {
+            const newPieces = [...prev];
+            newPieces[data.pieceIndex] = true;
+            return newPieces;
+          });
+          setOpponentPenalty(data.playerState?.penalty || 0);
+          setOpponentBackupTime(data.playerState?.backupTime || 300);
         } else {
-          showToast('对手已停手', 'info');
+          // 更新自己的状态（确认）
+          setMyPenalty(data.playerState?.penalty || 0);
+          setMyBackupTime(data.playerState?.backupTime || 300);
         }
         break;
-        
+
+      case 'player_passed':
+        setCurrentPlayer(data.nextPlayer);
+        setRoundStartTime(Date.now());
+        break;
+
       case 'game_ended':
-        setGameStatus('finished');
-        setGameResult({
-          winner: data.winner,
-          scores: data.scores,
-          penalties: data.penalties
-        });
+        setGameStatus('游戏结束');
+        // 可以显示结果弹窗
         break;
-        
-      case 'error':
-        showToast(data.message);
-        break;
+
+      default:
+        console.log('未处理的消息类型:', data.type);
     }
-  };
+  }
+
+  // 计时器
+  useEffect(() => {
+    if (gameStatus !== '游戏中' || !isMyTurn) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - roundStartTime) / 1000);
+      setCurrentTime(elapsed);
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [gameStatus, isMyTurn, roundStartTime]);
 
   // 开始游戏
   const handleStartGame = async () => {
     try {
       await gameAPI.startGame(roomId);
-    } catch (err) {
-      showToast('开始游戏失败');
+    } catch (error) {
+      console.error('开始游戏失败:', error);
     }
   };
 
   // 选择棋子
-  const handleSelectPiece = (pieceId) => {
-    if (usedPieces[myRole][pieceId]) return;
-    if (currentPlayer !== myRole) return;
-    if (gameStatus !== 'playing') return;
+  const handleSelectPiece = (pieceIndex) => {
+    if (myPieces[pieceIndex]) return; // 已使用
     
-    setSelectedPiece(pieceId);
-    setRotation(0);
-    setFlipped(false);
-    setPreviewPos(null);
+    // 清除之前的试下
+    setConfirmedPosition(null);
+    setPreviewPosition(null);
+    
+    setSelectedPiece(pieceIndex);
+    setTransformIndex(0);
   };
 
-  // 旋转/翻转
-  const handleRotate = () => setRotation((rotation + 1) % 4);
-  const handleFlip = () => setFlipped(!flipped);
-
-  // 棋盘点击
-  const handleBoardClick = (y, x) => {
-    if (selectedPiece === null) return;
-    if (currentPlayer !== myRole) return;
-    if (gameStatus !== 'playing') return;
-    
-    const shape = getPieceTransforms(selectedPiece, rotation, flipped);
-    
-    if (isOutOfBounds(shape, x, y)) {
-      showToast('超出边界');
-      return;
-    }
-    
-    if (isOverlapping(shape, x, y, board)) {
-      showToast('棋子重叠');
-      return;
-    }
-    
-    const playerId = myRole === 'creator' ? 1 : 2;
-    const isFirstMove = usedPieces[myRole].every(used => !used);
-    
-    if (!isValidPlacement(shape, x, y, board, playerId, isFirstMove)) {
-      showToast(isFirstMove ? '第一个棋子必须在角落' : '不符合角对角规则');
-      return;
-    }
-    
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'move',
-        pieceIndex: selectedPiece,
-        position: { x, y },
-        rotation,
-        flip: flipped
-      }));
-    } else {
-      showToast('连接断开，请等待重连');
-    }
+  // 形状变换
+  const handleTransform = () => {
+    setTransformIndex((prev) => (prev + 1) % TRANSFORM_STATES.length);
   };
 
-  // 停手
+  // 棋盘鼠标移动（预览）
+  const handleBoardHover = (x, y) => {
+    if (!isMyTurn || !currentShape || confirmedPosition) return;
+    
+    setPreviewPosition({ x, y });
+  };
+
+  // 棋盘点击（确认位置）
+  const handleBoardClick = (x, y) => {
+    if (!isMyTurn || !currentShape) return;
+    
+    // 验证合法性
+    if (isOutOfBounds(currentShape, x, y)) return;
+    if (isOverlapping(currentShape, x, y, board)) return;
+    if (!isValidPlacement(currentShape, x, y, board, myPlayerId, isFirstMove)) return;
+    
+    setConfirmedPosition({ x, y });
+    setPreviewPosition(null);
+  };
+
+  // 清除试下
+  const handleClearPreview = () => {
+    setConfirmedPosition(null);
+    setPreviewPosition(null);
+  };
+
+  // 确定下棋
+  const handleConfirmMove = () => {
+    if (!confirmedPosition || !currentShape) return;
+    
+    const { x, y } = confirmedPosition;
+    const transform = TRANSFORM_STATES[transformIndex];
+    
+    // 计算新棋盘
+    const newBoard = placePieceOnBoard(board, currentShape, x, y, myPlayerId);
+    
+    // 发送WebSocket消息
+    sendMessage({
+      type: 'move',
+      pieceIndex: selectedPiece,
+      position: { x, y },
+      rotation: transform.rotation,
+      flip: transform.flipped,
+      boardState: newBoard
+    });
+    
+    // 更新本地状态
+    setBoard(newBoard);
+    setMyPieces(prev => {
+      const newPieces = [...prev];
+      newPieces[selectedPiece] = true;
+      return newPieces;
+    });
+    
+    // 清除选择
+    setSelectedPiece(null);
+    setConfirmedPosition(null);
+    setTransformIndex(0);
+  };
+
+  // 停止下棋
   const handlePass = () => {
-    if (currentPlayer !== myRole) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'pass' }));
-    }
+    sendMessage({ type: 'pass' });
   };
 
-  // 渲染预览
-  const renderPreview = (y, x) => {
-    if (!selectedPiece && selectedPiece !== 0) return null;
-    if (!previewPos || previewPos.x !== x || previewPos.y !== y) return null;
+  // 渲染棋盘格子
+  const renderCell = (rowIndex, colIndex) => {
+    const cellValue = board[rowIndex][colIndex];
+    const isPreview = previewPosition && currentShape && 
+      rowIndex >= previewPosition.y && 
+      rowIndex < previewPosition.y + currentShape.length &&
+      colIndex >= previewPosition.x && 
+      colIndex < previewPosition.x + currentShape[0].length &&
+      currentShape[rowIndex - previewPosition.y][colIndex - previewPosition.x] === 1;
     
-    const shape = getPieceTransforms(selectedPiece, rotation, flipped);
-    const playerId = myRole === 'creator' ? 1 : 2;
-    const isFirstMove = usedPieces[myRole].every(used => !used);
-    
-    const isValid = !isOutOfBounds(shape, x, y) && 
-                    !isOverlapping(shape, x, y, board) &&
-                    isValidPlacement(shape, x, y, board, playerId, isFirstMove);
+    const isConfirmed = confirmedPosition && currentShape &&
+      rowIndex >= confirmedPosition.y && 
+      rowIndex < confirmedPosition.y + currentShape.length &&
+      colIndex >= confirmedPosition.x && 
+      colIndex < confirmedPosition.x + currentShape[0].length &&
+      currentShape[rowIndex - confirmedPosition.y][colIndex - confirmedPosition.x] === 1;
+
+    // 检查是否是最后一步的棋子
+    const isLastMove = lastMove && 
+      lastMove.player !== myRole &&
+      rowIndex >= lastMove.position.y && 
+      rowIndex < lastMove.position.y + currentShape?.length &&
+      colIndex >= lastMove.position.x && 
+      colIndex < lastMove.position.x + currentShape?.[0]?.length;
+
+    let bgColor = 'bg-white';
+    if (cellValue === 1) bgColor = 'bg-blue-400'; // 创建者
+    if (cellValue === 2) bgColor = 'bg-red-400';  // 加入者
+    if (isPreview) bgColor = myPlayerId === 1 ? 'bg-blue-200' : 'bg-red-200';
+    if (isConfirmed) bgColor = myPlayerId === 1 ? 'bg-blue-500' : 'bg-red-500';
+    if (isLastMove) bgColor = 'ring-2 ring-yellow-400';
+
+    return (
+      <div
+        key={`${rowIndex}-${colIndex}`}
+        className={`w-6 h-6 border border-gray-300 ${bgColor} ${isLastMove ? 'ring-2 ring-yellow-400' : ''}`}
+        onMouseEnter={() => handleBoardHover(colIndex, rowIndex)}
+        onClick={() => handleBoardClick(colIndex, rowIndex)}
+      />
+    );
+  };
+
+  // 渲染棋子预览
+  const renderPiecePreview = (shape, scale = 4) => {
+    if (!shape) return null;
     
     return (
-      <div className="absolute inset-0 pointer-events-none">
-        {shape.map((row, i) =>
-          row.map((cell, j) => {
-            if (!cell) return null;
-            const posY = y + i;
-            const posX = x + j;
-            if (posY >= 14 || posX >= 14) return null;
-            
-            return (
+      <div className="inline-block">
+        {shape.map((row, i) => (
+          <div key={i} className="flex">
+            {row.map((cell, j) => (
               <div
-                key={`preview-${i}-${j}`}
-                className={`absolute ${isValid ? 'bg-green-400' : 'bg-red-400'} opacity-50`}
-                style={{
-                  top: `${(posY / 14) * 100}%`,
-                  left: `${(posX / 14) * 100}%`,
-                  width: `${100 / 14}%`,
-                  height: `${100 / 14}%`
-                }}
+                key={j}
+                className={`w-${scale} h-${scale} ${
+                  cell === 1 ? (myPlayerId === 1 ? 'bg-blue-400' : 'bg-red-400') : 'bg-transparent'
+                }`}
               />
-            );
-          })
-        )}
+            ))}
+          </div>
+        ))}
       </div>
     );
   };
 
+  // 渲染状态文字
+  const getStatusText = () => {
+    if (gameStatus === '游戏结束') {
+      const finalMyScore = mySquares - myPenalty;
+      const finalOpponentScore = opponentSquares - opponentPenalty;
+      const myName = myRole === 'creator' ? 'A' : 'B';
+      const opponentName = myRole === 'creator' ? 'B' : 'A';
+      const winner = finalMyScore > finalOpponentScore ? myName : 
+                     finalOpponentScore > finalMyScore ? opponentName : '平局';
+      return `${myName}:${finalMyScore}格(${mySquares}-${myPenalty}格), ${opponentName}:${finalOpponentScore}格(${opponentSquares}-${opponentPenalty}格), ${winner}胜利`;
+    }
+    return gameStatus;
+  };
+
+  const getTurnText = () => {
+    if (gameStatus !== '游戏中') return '';
+    if (isMyTurn) return '我的回合';
+    return '对方回合';
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-xl">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      
-      <div className="max-w-7xl mx-auto">
-        {/* 顶部信息栏 */}
-        <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/home')}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                ← 返回
-              </button>
-              <div>
-                <h2 className="text-xl font-bold">房间号: {roomId}</h2>
-                <p className="text-sm text-gray-500">
-                  你是: {myRole === 'creator' ? '创建者（蓝色）' : '加入者（红色）'}
-                </p>
-              </div>
+    <div className="min-h-screen bg-gray-100 p-4">
+      <div className="max-w-7xl mx-auto flex gap-4">
+        {/* 左侧 */}
+        <div className="flex-1">
+          {/* 状态信息 */}
+          <div className="bg-white rounded-lg p-4 mb-4 space-y-2">
+            <div className="text-2xl font-bold">{getStatusText()}</div>
+            <div className="flex gap-4 text-sm">
+              <span>惩罚：-{myPenalty}格</span>
+              <span>格数：{mySquares}格</span>
+              <span className="font-semibold">{getTurnText()}</span>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <div className={`w-3 h-3 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              
-              {gameStatus === 'waiting' && myRole === 'creator' && (
-                <button
-                  onClick={handleStartGame}
-                  disabled={!gameState?.players?.joiner}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-                >
-                  {gameState?.players?.joiner ? '开始游戏' : '等待对手...'}
-                </button>
-              )}
-              
-              {gameStatus === 'playing' && (
-                <div className="text-lg font-semibold">
-                  {currentPlayer === myRole ? '你的回合' : '对手回合'}
-                </div>
+          </div>
+
+          {/* 棋盘 */}
+          <div className="bg-white rounded-lg p-4 inline-block">
+            <div className="grid grid-cols-14 gap-0">
+              {board.map((row, rowIndex) =>
+                row.map((_, colIndex) => renderCell(rowIndex, colIndex))
               )}
             </div>
           </div>
-          
-          {/* 计时器 */}
-          {gameStatus === 'playing' && (
-            <div className="space-y-2">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>回合时间</span>
-                  <span>{currentTime}s / {limitTime}s</span>
-                </div>
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-red-500 transition-all duration-1000"
-                    style={{ width: `${Math.max(0, (currentTime / limitTime) * 100)}%` }}
-                  />
-                </div>
+        </div>
+
+        {/* 右侧 */}
+        <div className="w-80 space-y-4">
+          {/* 进度条 */}
+          <div className="bg-white rounded-lg p-4 space-y-3">
+            <div>
+              <div className="text-sm mb-1">回合时间</div>
+              <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-red-500 transition-all"
+                  style={{ width: `${Math.max(0, 100 - (currentTime / limitTime) * 100)}%` }}
+                />
               </div>
-              
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>后备时间 ({currentPlayer === 'creator' ? '创建者' : '加入者'})</span>
-                  <span>{backupTime[currentPlayer]}s / 300s</span>
-                </div>
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-yellow-500 transition-all duration-1000"
-                    style={{ width: `${(backupTime[currentPlayer] / 300) * 100}%` }}
-                  />
-                </div>
+              <div className="text-right text-xs text-gray-500">{limitTime - currentTime}s</div>
+            </div>
+            <div>
+              <div className="text-sm mb-1">备用时间</div>
+              <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-yellow-500 transition-all"
+                  style={{ width: `${(myBackupTime / 300) * 100}%` }}
+                />
+              </div>
+              <div className="text-right text-xs text-gray-500">{Math.max(0, myBackupTime)}s</div>
+            </div>
+          </div>
+
+          {/* 棋子预览和控制 */}
+          <div className="bg-white rounded-lg p-4">
+            <div className="flex gap-4">
+              {/* 预览 */}
+              <div className="flex-1 border rounded-lg p-4 flex items-center justify-center min-h-[120px]">
+                {currentShape ? renderPiecePreview(currentShape, 6) : '选择棋子'}
+              </div>
+
+              {/* 按钮 */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleConfirmMove}
+                  disabled={!isMyTurn || !confirmedPosition}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition text-sm"
+                >
+                  确定下棋
+                </button>
+                <button
+                  onClick={handleTransform}
+                  disabled={!selectedPiece}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition text-sm"
+                >
+                  形状变换
+                </button>
+                <button
+                  onClick={handlePass}
+                  disabled={!isMyTurn}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-orange-700 transition text-sm"
+                >
+                  停止下棋
+                </button>
+                <button
+                  onClick={handleClearPreview}
+                  disabled={!confirmedPosition && !previewPosition}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-gray-700 transition text-sm"
+                >
+                  清除试下
+                </button>
               </div>
             </div>
+          </div>
+
+          {/* 棋子库 */}
+          <div className="bg-white rounded-lg p-4">
+            <div className="text-sm font-semibold mb-2">候选棋子</div>
+            <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto">
+              {PIECES.map((piece, index) => {
+                const isUsed = myPieces[index];
+                const isSelected = selectedPiece === index;
+                
+                return (
+                  <button
+                    key={piece.id}
+                    onClick={() => handleSelectPiece(index)}
+                    disabled={isUsed}
+                    className={`
+                      p-2 rounded-lg border-2 transition
+                      ${isUsed ? 'bg-gray-200 cursor-not-allowed' : 'bg-white hover:bg-gray-50'}
+                      ${isSelected ? 'border-blue-500' : 'border-gray-300'}
+                    `}
+                  >
+                    {renderPiecePreview(piece.shape, 2)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 开始游戏按钮（仅创建者可见） */}
+          {myRole === 'creator' && gameStatus === '等待开始' && (
+            <button
+              onClick={handleStartGame}
+              className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+            >
+              开始游戏
+            </button>
           )}
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* 棋盘 */}
-          <div className="lg:col-span-3 bg-white rounded-xl shadow-lg p-4">
-            <div className="aspect-square max-w-2xl mx-auto relative">
-              <div className="grid grid-cols-14 gap-0.5 bg-gray-300 p-1">
-                {board.map((row, y) =>
-                  row.map((cell, x) => (
-                    <div
-                      key={`${y}-${x}`}
-                      onClick={() => handleBoardClick(y, x)}
-                      onMouseEnter={() => setPreviewPos({ x, y })}
-                      onMouseLeave={() => setPreviewPos(null)}
-                      className={`
-                        aspect-square border border-gray-400 cursor-pointer transition
-                        ${cell === 0 ? 'bg-white hover:bg-gray-100' : ''}
-                        ${cell === 1 ? 'bg-blue-500' : ''}
-                        ${cell === 2 ? 'bg-red-500' : ''}
-                      `}
-                    />
-                  ))
-                )}
-              </div>
-              {previewPos && renderPreview(previewPos.y, previewPos.x)}
-            </div>
-            
-            {/* 操作按钮 */}
-            {gameStatus === 'playing' && currentPlayer === myRole && selectedPiece !== null && (
-              <div className="flex gap-2 mt-4 justify-center">
-                <button onClick={handleRotate} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                  旋转 ({rotation * 90}°)
-                </button>
-                <button onClick={handleFlip} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                  {flipped ? '已翻转' : '翻转'}
-                </button>
-                <button onClick={() => {
-                  setSelectedPiece(null);
-                  setRotation(0);
-                  setFlipped(false);
-                }} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
-                  取消
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 棋子面板 */}
-          <div className="bg-white rounded-xl shadow-lg p-4">
-            <h3 className="font-bold mb-4">我的棋子</h3>
-            <div className="grid grid-cols-3 gap-2 max-h-[600px] overflow-y-auto">
-              {PIECES.map((piece) => (
-                <button
-                  key={piece.id}
-                  onClick={() => handleSelectPiece(piece.id)}
-                  disabled={usedPieces[myRole]?.[piece.id] || currentPlayer !== myRole || gameStatus !== 'playing'}
-                  className={`
-                    p-2 border-2 rounded-lg transition
-                    ${selectedPiece === piece.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
-                    ${usedPieces[myRole]?.[piece.id] ? 'opacity-30 cursor-not-allowed' : 'hover:border-blue-400 cursor-pointer'}
-                    ${currentPlayer !== myRole || gameStatus !== 'playing' ? 'cursor-not-allowed opacity-50' : ''}
-                  `}
-                >
-                  <div className="aspect-square flex items-center justify-center">
-                    <div className="grid gap-0.5" style={{
-                      gridTemplateColumns: `repeat(${piece.shape[0].length}, minmax(0, 1fr))`
-                    }}>
-                      {piece.shape.map((row, i) =>
-                        row.map((cell, j) => (
-                          <div
-                            key={`${i}-${j}`}
-                            className={`w-2 h-2 ${cell ? (myRole === 'creator' ? 'bg-blue-500' : 'bg-red-500') : ''}`}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            
-            {gameStatus === 'playing' && currentPlayer === myRole && !isPassed && (
-              <button
-                onClick={handlePass}
-                className="w-full mt-4 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition"
-              >
-                停手
-              </button>
-            )}
-            
-            {isPassed && (
-              <div className="mt-4 p-3 bg-gray-100 rounded-lg text-center text-gray-600">
-                你已停手
-              </div>
-            )}
-          </div>
-        </div>
       </div>
-
-      {/* 游戏结束弹窗 */}
-      {gameResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold mb-4 text-center">游戏结束</h2>
-            <div className="space-y-4">
-              <div className="text-center text-xl font-semibold">
-                {gameResult.winner === 'draw' ? '平局！' : 
-                 gameResult.winner === myRole ? '你赢了！' : '你输了'}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-sm text-gray-600">创建者</div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {gameResult.scores.creator}
-                  </div>
-                  {gameResult.penalties.creator > 0 && (
-                    <div className="text-xs text-red-600">
-                      惩罚: -{gameResult.penalties.creator}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="text-sm text-gray-600">加入者</div>
-                  <div className="text-2xl font-bold text-red-600">
-                    {gameResult.scores.joiner}
-                  </div>
-                  {gameResult.penalties.joiner > 0 && (
-                    <div className="text-xs text-red-600">
-                      惩罚: -{gameResult.penalties.joiner}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <button
-                onClick={() => navigate('/home')}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition"
-              >
-                返回首页
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

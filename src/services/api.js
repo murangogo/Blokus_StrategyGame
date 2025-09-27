@@ -70,4 +70,22 @@ export const historyAPI = {
     api.get(`/history/${historyId}`)
 };
 
+// WebSocket连接函数（带token）
+export function createGameWebSocket(roomId, userId, onMessage) {
+  const token = localStorage.getItem('token');
+  const wsUrl = `${import.meta.env.PROD ? 'wss' : 'ws'}://${
+    import.meta.env.PROD ? 'gameapi.azuki.top' : '127.0.0.1:8787'
+  }/game/connect/${roomId}?playerId=${userId}`;
+  
+  // 注意：浏览器WebSocket不支持自定义headers
+  // token需要通过后端验证URL参数中的playerId
+  const ws = new WebSocket(wsUrl);
+  
+  ws.onmessage = (event) => {
+    onMessage(JSON.parse(event.data));
+  };
+  
+  return ws;
+}
+
 export default api;

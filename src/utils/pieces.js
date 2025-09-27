@@ -168,3 +168,36 @@ export function isValidPlacement(shape, x, y, board, playerId, isFirstMove) {
   
   return hasCornerAdjacent;
 }
+
+// 将棋子放置到棋盘（返回新棋盘）
+export function placePieceOnBoard(board, shape, x, y, playerId) {
+  const newBoard = board.map(row => [...row]);
+  
+  for (let i = 0; i < shape.length; i++) {
+    for (let j = 0; j < shape[i].length; j++) {
+      if (shape[i][j] === 1) {
+        const posY = y + i;
+        const posX = x + j;
+        newBoard[posY][posX] = playerId;
+      }
+    }
+  }
+  
+  return newBoard;
+}
+
+// 计算棋盘上某个玩家的格数
+export function countPlayerSquares(board, playerId) {
+  let count = 0;
+  for (let i = 0; i < board.length; i++) {
+    for (let j = 0; j < board[i].length; j++) {
+      if (board[i][j] === playerId) count++;
+    }
+  }
+  return count;
+}
+
+// 获取玩家ID（creator=1, joiner=2）
+export function getPlayerId(role) {
+  return role === 'creator' ? 1 : 2;
+}
