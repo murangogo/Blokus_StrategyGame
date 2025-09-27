@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://gameapi.azuki.top'
-  : 'https://gameapi.azuki.top';
+  ? 'https://gameapi.azuki.top'  
+  : 'http://127.0.0.1:8787';      
 
 // 创建axios实例
 const api = axios.create({
