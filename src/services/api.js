@@ -71,18 +71,30 @@ export const historyAPI = {
 };
 
 // WebSocket连接函数（带token）
-export function createGameWebSocket(roomId, userId, onMessage) {
+export function createGameWebSocket(roomId, onMessage) {
   const token = localStorage.getItem('token');
-  const wsUrl = `${import.meta.env.PROD ? 'wss' : 'ws'}://${
-    import.meta.env.PROD ? 'gameapi.azuki.top' : '127.0.0.1:8787'
-  }/game/connect/${roomId}?playerId=${userId}`;
+
+  if (!token) {
+    console.error("无法建立WebSocket连接：找不到token");
+    return null; 
+  }
+
+  // 不再传递明文的userId，而是传递token
+  const wsUrl = `${import.meta.env.PROD ? 'wss' : 'ws'}://${import.meta.env.PROD ? 'gameapi.azuki.top' : '127.0.0.1:8787'}/game/connect/${roomId}?token=${token}`;
   
-  // 注意：浏览器WebSocket不支持自定义headers
-  // token需要通过后端验证URL参数中的playerId
   const ws = new WebSocket(wsUrl);
   
   ws.onmessage = (event) => {
-    onMessage(JSON.parse(event.data));
+    const data = JSON.parse(event.data);
+    onMessage(data);
+  };
+  
+  ws.onerror = (error) => {
+    console.error("WebSocket 发生错误:", error);
+  };
+  
+  ws.onclose = (event) => {
+    console.log("WebSocket 连接已关闭:", event.code, event.reason);
   };
   
   return ws;
