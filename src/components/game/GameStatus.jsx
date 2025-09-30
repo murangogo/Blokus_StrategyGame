@@ -2,9 +2,10 @@
 import { 
   getGameStatusText, 
   getRoundStatusText,
-  countPlayerSquares,
   getPlayerId 
 } from '../../utils/gameHelpers';
+
+import { countPlayerSquares } from '../../utils/pieces';
 
 function GameStatus({ gameState, myRole, myState }) {
   // 获取游戏状态文本

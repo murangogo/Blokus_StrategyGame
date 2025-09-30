@@ -50,8 +50,6 @@ body {
   animation: slide-in 0.3s ease-out;
 }
 
-/* index.css - 在文件末尾添加 */
-
 /* 自定义滚动条样式（仅用于棋子选择器） */
 .scrollbar-thin::-webkit-scrollbar {
   height: 8px;
