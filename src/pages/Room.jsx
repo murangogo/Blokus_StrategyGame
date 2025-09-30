@@ -19,6 +19,8 @@ import {
   getPlayerId 
 } from '../utils/gameHelpers';
 
+import { getPieceTransforms } from '../utils/pieces';
+
 function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -132,8 +134,6 @@ function Room() {
       return;
     }
 
-    // 设置试下位置
-    const { getPieceTransforms } = require('../utils/pieces');
     const shape = getPieceTransforms(selectedPiece, rotation, flipped);
     
     setTrialPosition({
