@@ -48,8 +48,10 @@ function gameReducer(state, action) {
 
     case 'MOVE_MADE': {
       // 有玩家下棋
-      const { player, nextPlayer, currentRound, playerState, boardState } = action.payload;
+      const { player, pieceIndex, nextPlayer, currentRound, playerState, boardState } = action.payload;
       
+      console.log('[gameReducer] 处理 MOVE_MADE，棋盘:', boardState);
+
       // 更新对应玩家的状态
       const updatedState = {
         ...state,
@@ -64,15 +66,33 @@ function gameReducer(state, action) {
 
       // 更新下棋玩家的状态
       if (player === 'creator') {
+
+        // 确保状态存在
+        if (!state.creator) {
+          console.warn('[gameReducer] creator state is null, skipping update');
+          return state;
+        }
+
         updatedState.creator = {
           ...state.creator,
-          ...playerState
+          ...playerState,
+          pieces: state.creator.pieces ? [...state.creator.pieces] : Array(21).fill(false)
         };
+        updatedState.creator.pieces[pieceIndex] = true;
       } else {
+
+        // 确保状态存在
+        if (!state.joiner) {
+          console.warn('[gameReducer] joiner state is null, skipping update');
+          return state;
+        }
+
         updatedState.joiner = {
           ...state.joiner,
-          ...playerState
+          ...playerState,
+          pieces: state.joiner.pieces ? [...state.joiner.pieces] : Array(21).fill(false) 
         };
+        updatedState.joiner.pieces[pieceIndex] = true;
       }
 
       return updatedState;
@@ -203,6 +223,24 @@ export function useGameRoom(roomId) {
     }
   }, []);
 
+  // === 请求游戏状态 ===
+  const fetchGameState = useCallback(async () => {
+    try {
+      const { gameAPI } = await import('../services/api');
+      const response = await gameAPI.getState(roomId);
+      
+      if (response.data.success) {
+        console.log('[useGameRoom] 获取完整状态:', response.data.state);
+        dispatch({
+          type: 'SET_INITIAL_STATE',
+          payload: response.data.state
+        });
+      }
+    } catch (err) {
+      console.error('[useGameRoom] 获取状态失败:', err);
+    }
+  }, [roomId]);
+
   // === 处理广播消息 ===
   const handleBroadcast = useCallback((data) => {
     console.log('[useGameRoom] 收到广播:', data.type, data);
@@ -245,6 +283,8 @@ export function useGameRoom(roomId) {
       case 'game_started': {
         // 游戏开始
         dispatch({ type: 'GAME_STARTED' });
+        console.log('[useGameRoom] 游戏开始，请求完整状态同步');
+        fetchGameState();
         break;
       }
 
@@ -254,10 +294,11 @@ export function useGameRoom(roomId) {
           type: 'MOVE_MADE', 
           payload: {
             player: data.player,
+            pieceIndex: data.pieceIndex,
             nextPlayer: data.nextPlayer,
             currentRound: data.currentRound,
             playerState: data.playerState,
-            boardState: data.board // 后端可能返回完整棋盘
+            boardState: data.boardState // 后端返回完整棋盘
           }
         });
         break;
@@ -305,7 +346,7 @@ export function useGameRoom(roomId) {
       default:
         console.warn('[useGameRoom] 未知消息类型:', data.type);
     }
-  }, [determineRole]);
+  }, [determineRole, fetchGameState]);
 
   // === 启动心跳 ===
   const startHeartbeat = useCallback(() => {

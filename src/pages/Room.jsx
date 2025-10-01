@@ -318,6 +318,9 @@ function Room() {
               myRole={myRole}
               onCellClick={handleBoardClick}
               disabled={!isMyTurn || gameState.config?.gameStatus !== 'playing'}
+              selectedPiece={selectedPiece}  
+              rotation={rotation}            
+              flipped={flipped}              
             />
           </div>
 
@@ -335,8 +338,12 @@ function Room() {
               warningLevel={warningLevel}
               buttonStates={buttonStates}
               onStartGame={handleStartGame}
+              myRole={myRole}                      
+              gameStatus={gameState.config?.gameStatus} 
             />
 
+          {/* 棋子预览和操作按钮并排 */}
+          <div className="grid grid-cols-2 gap-6">
             <PiecePreview
               pieceId={selectedPiece}
               rotation={rotation}
@@ -352,6 +359,7 @@ function Room() {
               onPass={handlePass}
               onClearTrial={handleClearTrial}
             />
+          </div>
 
             <PieceSelector
               pieces={myState?.pieces || Array(21).fill(false)}

@@ -46,7 +46,7 @@ function GameStatus({ gameState, myRole, myState }) {
     <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
       {/* 游戏状态 - 最大最醒目 */}
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-1">
+        <h2 className="text-xl font-bold text-gray-800 mb-1">
           {gameStatusText}
         </h2>
         {gameState.config?.gameStatus === 'waiting' && (

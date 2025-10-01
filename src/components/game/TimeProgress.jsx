@@ -10,7 +10,9 @@ function TimeProgress({
   usingBackup,       // 是否正在使用backup时间
   warningLevel,      // 警告等级
   buttonStates,      // 按钮状态对象
-  onStartGame        // 开始游戏回调
+  onStartGame,        // 开始游戏回调
+  myRole,           // 我的角色
+  gameStatus        // 游戏状态
 }) {
   // 根据警告等级决定动画效果
   const getProgressAnimation = () => {
@@ -26,23 +28,37 @@ function TimeProgress({
     return '';
   };
 
+  // 根据游戏状态决定按钮文字
+  const getButtonText = () => {
+    if (gameStatus === 'playing' || gameStatus === 'finished') {
+      return '已开始游戏！';
+    }
+    if (buttonStates.startGame) {
+      return '开始游戏';
+    }
+    return '等待对手加入...';
+  };
+
+  // 游戏开始后按钮禁用
+  const isButtonDisabled = gameStatus !== 'waiting' || !buttonStates.startGame;
+
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
       {/* 开始游戏按钮 */}
       {buttonStates?.startGame !== undefined && (
         <button
           onClick={onStartGame}
-          disabled={!buttonStates.startGame}
+          disabled={isButtonDisabled}
           className={`
             w-full py-3 px-4 rounded-lg font-semibold text-lg
             transition-all duration-200 transform
-            ${buttonStates.startGame
+            ${!isButtonDisabled
               ? 'bg-green-600 hover:bg-green-700 text-white hover:scale-105 active:scale-95 cursor-pointer'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }
           `}
         >
-          {buttonStates.startGame ? '开始游戏' : '等待对手加入...'}
+          {getButtonText()}
         </button>
       )}
 

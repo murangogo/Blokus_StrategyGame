@@ -51,7 +51,7 @@ function PieceSelector({
         key={pieceId}
         onClick={() => !isUsed && onSelect(pieceId)}
         className={`
-          flex-shrink-0 w-24 h-24 rounded-lg p-2
+          flex-shrink-0 w-20 h-20 rounded-lg p-2
           flex flex-col items-center justify-center gap-1
           transition-all duration-200 transform
           ${getColorClass(isUsed, isSelected)}
@@ -126,24 +126,22 @@ function PieceSelector({
         </div>
       </div>
 
-      {/* 棋子列表 - 横向滚动 */}
+      {/* 增加高度，使用 flex-wrap 让棋子自动换行成两行 */}
       <div className="relative">
         <div 
-          className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+          className="flex flex-wrap gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: '#D1D5DB #F3F4F6'
+            scrollbarColor: '#D1D5DB #F3F4F6',
+            maxHeight: '180px'  // 限制高度为两行棋子的高度
           }}
         >
           {PIECES.map((_, index) => renderPiece(index))}
         </div>
 
-        {/* 滚动提示 */}
-        {PIECES.length > 5 && (
-          <div className="mt-2 text-center">
-            <p className="text-xs text-gray-400">← 滑动查看更多棋子 →</p>
-          </div>
-        )}
+        <div className="mt-2 text-center">
+          <p className="text-xs text-gray-400"> 上下滑动查看更多棋子 </p>
+        </div>
       </div>
 
       {/* 图例说明 */}

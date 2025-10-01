@@ -1,14 +1,21 @@
 // components/game/GameBoard.jsx
 import { getPlayerId, getLatestMove, isLatestMoveCell, getCellColorClass } from '../../utils/gameHelpers';
-import { useMemo } from 'react';
+import { getPieceTransforms } from '../../utils/pieces';
+import { useMemo, useState } from 'react';
 
 function GameBoard({ 
-  board,           // 棋盘状态 {board: [[]], moves: []}
-  trialPosition,   // 试下位置 {x, y, shape}
-  myRole,          // 我的角色
-  onCellClick,     // 点击格子回调
-  disabled = false // 是否禁用
+  board,            // 棋盘状态 {board: [[]], moves: []}
+  trialPosition,    // 试下位置 {x, y, shape}
+  myRole,           // 我的角色
+  onCellClick,      // 点击格子回调
+  disabled = false, // 是否禁用
+  selectedPiece,    // 选中的棋子
+  rotation,         // 旋转状态
+  flipped           // 翻转状态
 }) {
+  // 鼠标悬浮位置
+  const [hoverPosition, setHoverPosition] = useState(null);
+
   // 从moves中获取最新一步
   const latestMove = useMemo(() => {
     return getLatestMove(board.moves);
@@ -16,6 +23,23 @@ function GameBoard({
 
   // 获取实际的棋盘数组
   const boardArray = board.board || board;
+
+  // 获取悬浮棋子形状
+  const hoverShape = useMemo(() => {
+    if (!selectedPiece && selectedPiece !== 0) return null;
+    return getPieceTransforms(selectedPiece, rotation, flipped);
+  }, [selectedPiece, rotation, flipped]);
+
+  // 处理鼠标移动
+  const handleMouseMove = (x, y) => {
+    if (disabled || !hoverShape) return;
+    setHoverPosition({ x, y });
+  };
+
+  // 处理鼠标离开
+  const handleMouseLeave = () => {
+    setHoverPosition(null);
+  };
 
   // 渲染单个格子
   const renderCell = (x, y) => {
@@ -36,14 +60,31 @@ function GameBoard({
       }
     }
 
+    // 检查是否是鼠标悬浮位置
+    let isHover = false;
+    if (!trialPosition && hoverPosition && hoverShape) {
+      const { x: hoverX, y: hoverY } = hoverPosition;
+      for (let i = 0; i < hoverShape.length; i++) {
+        for (let j = 0; j < hoverShape[i].length; j++) {
+          if (hoverShape[i][j] === 1 && hoverY + i === y && hoverX + j === x) {
+            isHover = true;
+            break;
+          }
+        }
+        if (isHover) break;
+      }
+    }
+
     // 检查是否是最新一步
     const isLatest = isLatestMoveCell(x, y, latestMove);
 
     // 确定格子所属玩家（用于试下颜色）
-    const playerRole = isTrial ? myRole : (cellValue === 1 ? 'creator' : 'joiner');
+    const playerRole = (isTrial || isHover) ? myRole : (cellValue === 1 ? 'creator' : 'joiner');
 
     // 获取颜色类名
-    const colorClass = getCellColorClass(cellValue, isLatest, isTrial, playerRole);
+    const colorClass = isHover 
+      ? (myRole === 'creator' ? 'bg-[#FFD4DC]' : 'bg-[#D4E4FF]')  // 更浅的颜色
+      : getCellColorClass(cellValue, isLatest, isTrial, playerRole);
 
     // 是否可点击（空格子且未禁用且不是试下格子）
     const canClick = !disabled && cellValue === 0 && !isTrial;
@@ -52,13 +93,15 @@ function GameBoard({
       <div
         key={`${x}-${y}`}
         onClick={() => canClick && onCellClick(x, y)}
+        onMouseEnter={() => handleMouseMove(x, y)}
         className={`
           aspect-square border border-gray-300
           ${colorClass}
-          ${canClick ? 'cursor-pointer' : 'cursor-default'}
+          ${canClick && hoverShape ? 'cursor-pointer' : 'cursor-default'}
           ${isTrial ? 'opacity-70 animate-pulse' : ''}
-          ${isLatest && !isTrial ? 'ring-2 ring-offset-1 ring-yellow-400' : ''}
-          transition-all duration-150
+          ${isHover ? 'opacity-60' : ''}
+          ${isLatest && !isTrial && !isHover ? 'ring-2 ring-offset-1 ring-yellow-400' : ''}
+          transition-all duration-100
         `}
       />
     );
@@ -82,7 +125,7 @@ function GameBoard({
       </div>
 
       {/* 棋盘网格容器 */}
-      <div className="w-full max-w-2xl mx-auto">
+      <div className="w-full max-w-2xl mx-auto" onMouseLeave={handleMouseLeave}>
         <div 
           className="grid gap-0 w-full aspect-square"
           style={{ 
@@ -107,6 +150,15 @@ function GameBoard({
         <div className="mt-4 text-center">
           <p className="text-sm text-blue-600">
             试下位置: ({trialPosition.x}, {trialPosition.y}) - 点击"确定下棋"完成落子
+          </p>
+        </div>
+      )}
+
+      {/* 悬浮提示 */}
+      {!trialPosition && hoverPosition && !disabled && (
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-500">
+            点击格子确定试下位置
           </p>
         </div>
       )}

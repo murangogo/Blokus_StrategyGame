@@ -163,6 +163,10 @@ export function getGameStatusText(gameState, myRole) {
   if (!gameState.config) return '加载中...';
   
   const { gameStatus } = gameState.config;
+
+  // 获取玩家账号名称
+  const creatorName = gameState.players?.creator?.account || '创建者';
+  const joinerName = gameState.players?.joiner?.account || '加入者';
   
   switch (gameStatus) {
     case 'waiting':
@@ -171,7 +175,7 @@ export function getGameStatusText(gameState, myRole) {
           ? '等待开始游戏' 
           : '等待对手加入';
       } else {
-        return '等待房主开始游戏';
+        return `等待 ${creatorName} 开始游戏`;
       }
       
     case 'playing':
@@ -189,11 +193,11 @@ export function getGameStatusText(gameState, myRole) {
       const joinerPenalty = penalties?.joiner || 0;
       
       if (winner === 'draw') {
-        return `平局 - 创建者: ${creatorFinal}格(惩罚${creatorPenalty}格), 加入者: ${joinerFinal}格(惩罚${joinerPenalty}格)`;
+        return `平局 - ${creatorName}: ${creatorFinal}格(惩罚${creatorPenalty}格), ${joinerName}: ${joinerFinal}格(惩罚${joinerPenalty}格)`;
       }
       
-      const winnerText = winner === 'creator' ? '创建者胜利' : '加入者胜利';
-      return `${winnerText} - 创建者: ${creatorFinal}格(惩罚${creatorPenalty}格), 加入者: ${joinerFinal}格(惩罚${joinerPenalty}格)`;
+      const winnerName = winner === 'creator' ? creatorName : joinerName;
+      return `${winnerName} 胜利 - ${creatorName}: ${creatorFinal}格(惩罚${creatorPenalty}格), ${joinerName}: ${joinerFinal}格(惩罚${joinerPenalty}格)`;
     }
       
     default:
@@ -219,6 +223,11 @@ export function getRoundStatusText(gameState, myRole) {
   const opponentRole = getOpponentRole(myRole);
   const opponentState = opponentRole === 'creator' ? gameState.creator : gameState.joiner;
   
+  // 获取对手名字
+  const opponentName = opponentRole === 'creator' 
+    ? gameState.players?.creator?.account || '对方'
+    : gameState.players?.joiner?.account || '对方';
+
   // 双方都停手
   if (myState?.passed && opponentState?.passed) {
     return '游戏即将结束';
@@ -226,16 +235,16 @@ export function getRoundStatusText(gameState, myRole) {
   
   // 我停手了
   if (myState?.passed) {
-    return '我已停手，等待对方';
+    return `我已停手，等待 ${opponentName}`;
   }
   
   // 对方停手了
   if (opponentState?.passed) {
-    return '对方已停手';
+    return `${opponentName} 已停手`;
   }
   
   // 正常回合
-  return currentPlayer === myRole ? '我的回合' : '对方回合';
+  return currentPlayer === myRole ? '我的回合' : `${opponentName} 的回合`;
 }
 
 /**
@@ -265,6 +274,10 @@ export function calculateButtonStates(gameState, myRole, selectedPiece, trialPos
   const myState = myRole === 'creator' ? gameState.creator : gameState.joiner;
   const opponentState = myRole === 'creator' ? gameState.joiner : gameState.creator;
   
+  const hasOpponent = myRole === 'creator' 
+    ? !!gameState.players?.joiner 
+    : !!gameState.players?.creator;
+
   return {
     // 确定下棋：我的回合 + 有试下位置 + 游戏中
     confirmMove: isMyTurn && !!trialPosition && gameStatus === 'playing',
@@ -282,7 +295,7 @@ export function calculateButtonStates(gameState, myRole, selectedPiece, trialPos
     clearTrial: !!trialPosition,
     
     // 开始游戏：我是创建者 + 有对手 + 等待状态
-    startGame: myRole === 'creator' && !!opponentState && gameStatus === 'waiting'
+    startGame: myRole === 'creator' && hasOpponent && gameStatus === 'waiting'
   };
 }
 
