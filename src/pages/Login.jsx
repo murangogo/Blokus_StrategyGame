@@ -165,7 +165,7 @@ function Login() {
 
         {/* 底部提示 */}
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>首次使用？请联系管理员获取账号</p>
+          <p>一个简单的策略游戏，缅怀一段短暂的时光。</p>
         </div>
       </div>
     </div>

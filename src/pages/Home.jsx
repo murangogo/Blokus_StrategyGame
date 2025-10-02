@@ -104,6 +104,7 @@ function Home() {
                 欢迎！{user?.account || '玩家'}
               </h1>
               <p className="text-gray-500">角斗士棋 Blokus - 双人对战</p>
+              <p className="text-gray-500">一个简单的策略游戏，缅怀一段短暂的时光。</p>
             </div>
             <button
               onClick={handleLogout}
