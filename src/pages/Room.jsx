@@ -235,10 +235,8 @@ function Room() {
   // === 游戏结束处理 ===
   useEffect(() => {
     if (gameState.config?.gameStatus === 'finished') {
-      // 可以在这里保存历史记录到D1
+      // 游戏结束
       console.log('游戏结束', gameState.winner, gameState.finalScores);
-      
-      // TODO: 调用 historyAPI.save() 保存游戏记录
     }
   }, [gameState.config?.gameStatus, gameState.winner, gameState.finalScores]);
 

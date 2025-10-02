@@ -64,8 +64,8 @@ export const gameAPI = {
 };
 
 export const historyAPI = {
-  getList: (userId, limit = 50) => 
-    api.get('/history/list', { params: { userId, limit } }),
+  getList: () => 
+    api.get('/history/list'),
   getDetail: (historyId) => 
     api.get(`/history/${historyId}`)
 };

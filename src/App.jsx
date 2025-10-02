@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Home from './pages/Home';
 import Room from './pages/Room';
 import History from './pages/History';
+import HistoryDetail from './pages/HistoryDetail';
 import { getToken } from './utils/auth';
 
 // 路由守卫组件
@@ -37,6 +38,14 @@ function App() {
           element={
             <PrivateRoute>
               <History />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/history/:id" 
+          element={
+            <PrivateRoute>
+              <HistoryDetail />
             </PrivateRoute>
           } 
         />

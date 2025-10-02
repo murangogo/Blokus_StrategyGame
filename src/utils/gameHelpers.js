@@ -427,27 +427,3 @@ export function canContinuePlaying(board, piecesUsed, role, playerState) {
   
   return false;
 }
-
-/**
- * 生成历史记录保存数据
- * @param {object} gameState - 游戏状态
- * @param {string} roomId - 房间ID
- * @returns {object} 历史记录数据
- */
-export function generateHistoryData(gameState, roomId) {
-  const { players, board, creator, joiner, winner, finalScores, penalties } = gameState;
-  
-  return {
-    roomId,
-    creatorId: players.creator.userId,
-    joinerId: players.joiner.userId,
-    winner: winner === 'draw' ? null : winner,
-    creatorScore: finalScores.creator,
-    joinerScore: finalScores.joiner,
-    creatorPenalty: penalties.creator,
-    joinerPenalty: penalties.joiner,
-    boardState: board.board || board,
-    totalRounds: gameState.progress.currentRound,
-    gameDuration: Math.floor((Date.now() - gameState.progress.gameStartTime) / 1000)
-  };
-}
