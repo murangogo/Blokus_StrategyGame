@@ -36,7 +36,11 @@ function TimeProgress({
     if (buttonStates.startGame) {
       return '开始游戏';
     }
-    return '等待对手加入...';
+    if (myRole == 'creator') {
+      return '等待对手加入...';
+    } else {
+      return '等待房主开始游戏...';
+    }
   };
 
   // 游戏开始后按钮禁用

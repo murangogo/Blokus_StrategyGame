@@ -59,8 +59,8 @@ function Room() {
     backupDisplay,
     warningLevel
   } = useGameTimer(
-    gameState.config?.limitTime || 60,
-    myState?.backupTime || 300,
+    gameState.config?.limitTime ?? 60,
+    myState?.backupTime ?? 300,
     isMyTurn,
     gameState.progress?.roundStartTime,
     gameState.config?.gameStatus

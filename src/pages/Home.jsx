@@ -190,7 +190,7 @@ function Home() {
               min="10"
               max="3600"
             />
-            <p className="text-xs text-gray-500 mt-1">范围：10-3600秒</p>
+            <p className="text-xs text-gray-500 mt-1">范围：60-300秒</p>
           </div>
 
           {error && (
