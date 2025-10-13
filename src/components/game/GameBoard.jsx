@@ -26,7 +26,7 @@ function GameBoard({
 
   // 获取悬浮棋子形状
   const hoverShape = useMemo(() => {
-    if (!selectedPiece && selectedPiece !== 0) return null;
+    if (selectedPiece == null) return null;
     return getPieceTransforms(selectedPiece, rotation, flipped);
   }, [selectedPiece, rotation, flipped]);
 

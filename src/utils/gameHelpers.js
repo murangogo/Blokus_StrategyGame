@@ -283,10 +283,10 @@ export function calculateButtonStates(gameState, myRole, selectedPiece, trialPos
     confirmMove: isMyTurn && !!trialPosition && gameStatus === 'playing',
     
     // 旋转：有选中棋子
-    rotate: !!selectedPiece,
+    rotate: typeof selectedPiece === 'number',
     
     // 翻转：有选中棋子
-    flip: !!selectedPiece,
+    flip: typeof selectedPiece === 'number',
     
     // 停手：我的回合 + 游戏中 + 我未停手
     pass: isMyTurn && gameStatus === 'playing' && !myState?.passed,

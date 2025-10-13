@@ -87,7 +87,7 @@ function Room() {
 
   // === 事件处理：旋转棋子 ===
   const handleRotate = () => {
-    if (!selectedPiece) return;
+    if (selectedPiece == null) return;
     
     setRotation((prev) => (prev + 1) % 4);
     
@@ -99,7 +99,7 @@ function Room() {
 
   // === 事件处理：翻转棋子 ===
   const handleFlip = () => {
-    if (!selectedPiece) return;
+    if (selectedPiece == null) return;
     
     setFlipped((prev) => !prev);
     
@@ -111,7 +111,7 @@ function Room() {
 
   // === 事件处理：点击棋盘格子 ===
   const handleBoardClick = (x, y) => {
-    if (!selectedPiece || !isMyTurn || gameState.config?.gameStatus !== 'playing') {
+    if (selectedPiece == null || !isMyTurn || gameState.config?.gameStatus !== 'playing') {
       return;
     }
 
