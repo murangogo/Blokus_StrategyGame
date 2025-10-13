@@ -198,7 +198,7 @@ function Room() {
   const handlePass = async () => {
     if (isSubmitting) return;
 
-    const confirmed = window.confirm('确定要停止下棋吗？停手后将等待对方行动。');
+    const confirmed = window.confirm('确定要停止下棋吗？停手后本局将不再有下棋机会。');
     if (!confirmed) return;
 
     setIsSubmitting(true);
