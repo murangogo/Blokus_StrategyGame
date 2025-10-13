@@ -201,3 +201,32 @@ export function countPlayerSquares(board, playerId) {
 export function getPlayerId(role) {
   return role === 'creator' ? 1 : 2;
 }
+
+/**
+ * 计算棋子形状的锚点偏移
+ * 返回第一个实际方块的位置作为锚点
+ * @param {array} shape - 棋子形状二维数组
+ * @returns {object} { offsetX: number, offsetY: number }
+ */
+export function calculatePieceOffset(shape) {
+  // 找到第一行有方块的行
+  let offsetY = 0;
+  for (let i = 0; i < shape.length; i++) {
+    const hasBlock = shape[i].some(cell => cell === 1);
+    if (hasBlock) {
+      offsetY = i;
+      break;
+    }
+  }
+  
+  // 在这一行中，找到第一个方块的列
+  let offsetX = 0;
+  for (let j = 0; j < shape[offsetY].length; j++) {
+    if (shape[offsetY][j] === 1) {
+      offsetX = j;
+      break;
+    }
+  }
+  
+  return { offsetX, offsetY };
+}

@@ -1,5 +1,5 @@
 // components/game/PiecePreview.jsx
-import { getPieceTransforms } from '../../utils/pieces';
+import { getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
 import { PIECES } from '../../utils/pieces';
 
 function PiecePreview({ 
@@ -27,6 +27,7 @@ function PiecePreview({
 
   // 获取变换后的棋子形状
   const shape = getPieceTransforms(pieceId, rotation, flipped);
+  const offset = calculatePieceOffset(shape);
   
   // 获取棋子信息
   const pieceInfo = PIECES[pieceId];
@@ -73,19 +74,31 @@ function PiecePreview({
           }}
         >
           {shape.map((row, y) =>
-            row.map((cell, x) => (
-              <div
-                key={`${x}-${y}`}
-                className={`
-                  ${getCellSize()}
-                  ${cell === 1 
-                    ? `${cellColor} ${borderColor} border-2 rounded shadow-sm` 
-                    : 'bg-transparent'
-                  }
-                  transition-all duration-200
-                `}
-              />
-            ))
+            row.map((cell, x) => {
+              const isAnchor = (y === offset.offsetY && x === offset.offsetX);
+              
+              return (
+                <div
+                  key={`${x}-${y}`}
+                  className={`
+                    ${getCellSize()}
+                    ${cell === 1 
+                      ? `${cellColor} ${borderColor} border-2 rounded shadow-sm 
+                        ${isAnchor ? 'ring-4 ring-offset-1 ring-yellow-400' : ''}` 
+                      : 'bg-transparent'
+                    }
+                    transition-all duration-200
+                    relative
+                  `}
+                >
+                  {isAnchor && cell === 1 && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full shadow-lg"></div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -106,6 +119,10 @@ function PiecePreview({
             <span>已翻转</span>
           </div>
         )}
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 bg-white rounded-full border-2 border-yellow-400 shadow"></div>
+          <span>锚点</span>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 // components/game/GameBoard.jsx
 import { getPlayerId, getLatestMove, isLatestMoveCell, getCellColorClass } from '../../utils/gameHelpers';
-import { getPieceTransforms } from '../../utils/pieces';
+import { getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
 import { useMemo, useState } from 'react';
 
 function GameBoard({ 
@@ -25,15 +25,22 @@ function GameBoard({
   const boardArray = board.board || board;
 
   // 获取悬浮棋子形状
-  const hoverShape = useMemo(() => {
+  const hoverShapeData = useMemo(() => {
     if (selectedPiece == null) return null;
-    return getPieceTransforms(selectedPiece, rotation, flipped);
+    const shape = getPieceTransforms(selectedPiece, rotation, flipped);
+    const offset = calculatePieceOffset(shape);
+    return { shape, offset };
   }, [selectedPiece, rotation, flipped]);
 
   // 处理鼠标移动
   const handleMouseMove = (x, y) => {
-    if (disabled || !hoverShape) return;
-    setHoverPosition({ x, y });
+    if (disabled || !hoverShapeData) return;
+    
+    // 应用偏移：鼠标位置就是锚点位置，需要减去offset得到实际的左上角
+    setHoverPosition({ 
+      x: x - hoverShapeData.offset.offsetX, 
+      y: y - hoverShapeData.offset.offsetY 
+    });
   };
 
   // 处理鼠标离开
@@ -62,11 +69,12 @@ function GameBoard({
 
     // 检查是否是鼠标悬浮位置
     let isHover = false;
-    if (!trialPosition && hoverPosition && hoverShape) {
+    if (!trialPosition && hoverPosition && hoverShapeData) {
+      const { shape } = hoverShapeData;
       const { x: hoverX, y: hoverY } = hoverPosition;
-      for (let i = 0; i < hoverShape.length; i++) {
-        for (let j = 0; j < hoverShape[i].length; j++) {
-          if (hoverShape[i][j] === 1 && hoverY + i === y && hoverX + j === x) {
+      for (let i = 0; i < shape.length; i++) {
+        for (let j = 0; j < shape[i].length; j++) {
+          if (shape[i][j] === 1 && hoverY + i === y && hoverX + j === x) {
             isHover = true;
             break;
           }
@@ -97,7 +105,7 @@ function GameBoard({
         className={`
           aspect-square border border-gray-300
           ${colorClass}
-          ${canClick && hoverShape ? 'cursor-pointer' : 'cursor-default'}
+          ${canClick && hoverShapeData ? 'cursor-pointer' : 'cursor-default'}
           ${isTrial ? 'opacity-70 animate-pulse' : ''}
           ${isHover ? 'opacity-60' : ''}
           ${isLatest && !isTrial && !isHover ? 'ring-2 ring-offset-1 ring-yellow-400' : ''}

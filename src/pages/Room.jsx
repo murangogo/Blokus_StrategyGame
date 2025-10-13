@@ -19,7 +19,7 @@ import {
   getPlayerId 
 } from '../utils/gameHelpers';
 
-import { getPieceTransforms } from '../utils/pieces';
+import { getPieceTransforms, calculatePieceOffset } from '../utils/pieces';
 
 function Room() {
   const { roomId } = useParams();
@@ -115,11 +115,19 @@ function Room() {
       return;
     }
 
-    // 检查是否可以放置
+    // 获取当前棋子形状及其偏移
+    const shape = getPieceTransforms(selectedPiece, rotation, flipped);
+    const offset = calculatePieceOffset(shape);
+    
+    // 用户点击的是锚点位置，需要减去偏移得到实际的左上角位置
+    const actualX = x - offset.offsetX;
+    const actualY = y - offset.offsetY;
+
+    // 使用实际的左上角位置进行验证
     const validation = canPlacePiece(
       selectedPiece,
-      x,
-      y,
+      actualX,
+      actualY,
       rotation,
       flipped,
       gameState.board.board || gameState.board,
@@ -128,17 +136,15 @@ function Room() {
     );
 
     if (!validation.valid) {
-      // 显示错误提示（可以用toast或alert）
       console.warn('无法放置:', validation.reason);
       alert(validation.reason);
       return;
     }
 
-    const shape = getPieceTransforms(selectedPiece, rotation, flipped);
-    
+    // 保存试下位置时使用实际的左上角坐标
     setTrialPosition({
-      x,
-      y,
+      x: actualX,
+      y: actualY,
       shape
     });
   };
