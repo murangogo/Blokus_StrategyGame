@@ -12,7 +12,7 @@ function Home() {
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [resultModalOpen, setResultModalOpen] = useState(false);
   
-  const [limitTime, setLimitTime] = useState('180');
+  const [limitTime, setLimitTime] = useState('120');
   const [roomIdInput, setRoomIdInput] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState('');
   
@@ -22,8 +22,8 @@ function Home() {
   // 创建房间
   const handleCreateRoom = async () => {
     const time = parseInt(limitTime);
-    if (isNaN(time) || time < 60 || time > 300) {
-      setError('请输入有效的时间（60-300秒）');
+    if (isNaN(time) || time < 15 || time > 180) {
+      setError('请输入有效的时间（15-180秒）');
       return;
     }
 
@@ -122,7 +122,7 @@ function Home() {
             onClick={() => {
               setCreateModalOpen(true);
               setError('');
-              setLimitTime('180');
+              setLimitTime('120');
             }}
             className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:scale-105 active:scale-95"
           >
@@ -186,11 +186,11 @@ function Home() {
               onChange={(e) => setLimitTime(e.target.value)}
               disabled={loading}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
-              placeholder="默认180秒"
-              min="10"
-              max="3600"
+              placeholder="默认120秒"
+              min="15"
+              max="180"
             />
-            <p className="text-xs text-gray-500 mt-1">范围：60-300秒</p>
+            <p className="text-xs text-gray-500 mt-1">范围：15-180秒</p>
           </div>
 
           {error && (
