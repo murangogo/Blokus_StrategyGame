@@ -1,4 +1,4 @@
-// components/game/PiecePreview.jsx
+// 路径：src/components/game/PiecePreview.jsx
 import { getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
 import { PIECES } from '../../utils/pieces';
 

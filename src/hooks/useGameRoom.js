@@ -1,4 +1,4 @@
-// hooks/useGameRoom.js
+// 路径：src/hooks/useGameRoom.js
 import { useState, useEffect, useRef, useReducer, useCallback } from 'react';
 import { createGameWebSocket } from '../services/api';
 import { getUser } from '../utils/auth';

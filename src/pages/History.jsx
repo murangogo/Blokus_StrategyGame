@@ -1,4 +1,4 @@
-// pages/History.jsx
+// 路径：src/pages/History.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { historyAPI } from '../services/api';

@@ -1,4 +1,4 @@
-// hooks/useGameTimer.js
+// 路径：src/hooks/useGameTimer.js
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**

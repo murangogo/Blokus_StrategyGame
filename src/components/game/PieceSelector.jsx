@@ -1,4 +1,4 @@
-// components/game/PieceSelector.jsx
+// 路径：src/components/game/PieceSelector.jsx
 import { PIECES, getPieceTransforms } from '../../utils/pieces';
 
 function PieceSelector({ 

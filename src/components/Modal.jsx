@@ -1,3 +1,4 @@
+// 路径：src/components/Modal.jsx
 function Modal({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
 

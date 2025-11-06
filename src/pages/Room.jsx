@@ -1,4 +1,4 @@
-// pages/Room.jsx
+// 路径：src/pages/Room.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameRoom } from '../hooks/useGameRoom';

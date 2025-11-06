@@ -1,4 +1,4 @@
-// utils/gameHelpers.js
+// 路径：src/utils/gameHelpers.js
 import { 
   getPieceTransforms, 
   isOutOfBounds, 

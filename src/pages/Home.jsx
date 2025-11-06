@@ -1,3 +1,4 @@
+// 路径：src/pages/Home.jsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../utils/auth';

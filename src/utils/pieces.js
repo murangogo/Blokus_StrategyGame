@@ -1,3 +1,4 @@
+// 路径：src/utils/pieces.js
 // 21种Blokus棋子形状定义
 // 每个棋子用二维数组表示，1表示有方块，0表示空白
 export const PIECES = [

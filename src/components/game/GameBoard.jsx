@@ -1,4 +1,4 @@
-// components/game/GameBoard.jsx
+// 路径：src/components/game/GameBoard.jsx
 import { getPlayerId, getLatestMove, isLatestMoveCell, getCellColorClass } from '../../utils/gameHelpers';
 import { getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
 import { useMemo, useState } from 'react';

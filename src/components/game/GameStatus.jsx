@@ -1,4 +1,4 @@
-// components/game/GameStatus.jsx
+// 路径：src/components/game/GameStatus.jsx
 import { 
   getGameStatusText, 
   getRoundStatusText,

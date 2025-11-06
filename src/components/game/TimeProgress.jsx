@@ -1,4 +1,4 @@
-// components/game/TimeProgress.jsx
+// 路径：src/components/game/TimeProgress.jsx
 function TimeProgress({ 
   limitProgress,      // limit时间进度 (0-100)
   backupProgress,     // backup时间进度 (0-100)
