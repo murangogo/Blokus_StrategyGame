@@ -11,22 +11,41 @@ function gameReducer(state, action) {
       return {
         ...state,
         config: action.payload.config,
-        players: action.payload.players,
+        players: action.payload.players || [],
+        playerStates: action.payload.playerStates || {},
+        colors: action.payload.colors || {},
         progress: action.payload.progress,
-        board: action.payload.board?.board || state.board,
-        creator: action.payload.creator,
-        joiner: action.payload.joiner,
+        board: action.payload.board || state.board,
         initialized: true
       };
     }
 
     case 'PLAYER_JOINED': {
-      // 有玩家加入
+      // 有玩家加入 - 完善逻辑
+      const { playerIndex, playerInfo, updatedPlayers, playerCount, requiredCount } = action.payload;
+      
+      // 如果后端提供了完整的更新玩家列表，则使用它
+      let newPlayers;
+      if (updatedPlayers) {
+        newPlayers = updatedPlayers;
+      } else {
+        // 否则只更新特定位置的玩家
+        newPlayers = [...state.players];
+        if (playerIndex !== undefined && playerInfo) {
+          newPlayers[playerIndex] = playerInfo;
+        }
+      }
+      
       return {
         ...state,
-        players: {
-          ...state.players,
-          joiner: action.payload
+        players: newPlayers,
+        config: {
+          ...state.config,
+          playerCount: playerCount || state.config?.playerCount,
+          requiredPlayerCount: requiredCount || state.config?.requiredPlayerCount,
+          // 更新状态，确保UI反映当前状态
+          hasEnoughPlayers: (playerCount || newPlayers.filter(p => p).length) >= 
+                            (requiredCount || state.config?.requiredPlayerCount || 2)
         }
       };
     }
@@ -41,91 +60,78 @@ function gameReducer(state, action) {
         },
         progress: {
           ...state.progress,
-          currentPlayer: 'creator' // 游戏开始时总是创建者先手
+          currentPlayer: 'p1', // 游戏开始时总是p1先手
+          roundStartTime: Date.now()
         }
       };
     }
 
     case 'MOVE_MADE': {
       // 有玩家下棋
-      const { player, pieceIndex, nextPlayer, currentRound, playerState, boardState } = action.payload;
+      const { 
+        playerId, 
+        pieceIndex, 
+        nextPlayer, 
+        currentRound, 
+        playerState, 
+        boardState 
+      } = action.payload;
       
-      console.log('[gameReducer] 处理 MOVE_MADE，棋盘:', boardState);
-
       // 更新对应玩家的状态
-      const updatedState = {
+      const updatedPlayerStates = {
+        ...state.playerStates,
+        [playerId]: {
+          ...state.playerStates[playerId],
+          ...playerState,
+          pieces: state.playerStates[playerId]?.pieces 
+            ? [...state.playerStates[playerId].pieces] 
+            : Array(21).fill(false)
+        }
+      };
+      
+      // 标记该棋子已使用
+      if (updatedPlayerStates[playerId]?.pieces) {
+        updatedPlayerStates[playerId].pieces[pieceIndex] = true;
+      }
+      
+      return {
         ...state,
         board: boardState || state.board,
+        playerStates: updatedPlayerStates,
         progress: {
           ...state.progress,
           currentPlayer: nextPlayer,
           currentRound: currentRound,
-          roundStartTime: Date.now() // 新回合开始时间
+          roundStartTime: Date.now(), // 新回合开始时间
+          activePlayerCount: action.payload.activePlayerCount || state.progress?.activePlayerCount
         }
       };
-
-      // 更新下棋玩家的状态
-      if (player === 'creator') {
-
-        // 确保状态存在
-        if (!state.creator) {
-          console.warn('[gameReducer] creator state is null, skipping update');
-          return state;
-        }
-
-        updatedState.creator = {
-          ...state.creator,
-          ...playerState,
-          pieces: state.creator.pieces ? [...state.creator.pieces] : Array(21).fill(false)
-        };
-        updatedState.creator.pieces[pieceIndex] = true;
-      } else {
-
-        // 确保状态存在
-        if (!state.joiner) {
-          console.warn('[gameReducer] joiner state is null, skipping update');
-          return state;
-        }
-
-        updatedState.joiner = {
-          ...state.joiner,
-          ...playerState,
-          pieces: state.joiner.pieces ? [...state.joiner.pieces] : Array(21).fill(false) 
-        };
-        updatedState.joiner.pieces[pieceIndex] = true;
-      }
-
-      return updatedState;
     }
 
     case 'PLAYER_PASSED': {
       // 有玩家停手
-      const { player, nextPlayer, currentRound } = action.payload;
+      const { playerId, nextPlayer, currentRound, activePlayerCount } = action.payload;
       
-      const updatedState = {
+      // 标记停手玩家
+      const updatedPlayerStates = {
+        ...state.playerStates,
+        [playerId]: {
+          ...state.playerStates[playerId],
+          passed: true
+        }
+      };
+      
+      return {
         ...state,
+        playerStates: updatedPlayerStates,
         progress: {
           ...state.progress,
           currentPlayer: nextPlayer,
           currentRound: currentRound,
-          roundStartTime: Date.now()
+          roundStartTime: Date.now(),
+          activePlayerCount: activePlayerCount || state.progress?.activePlayerCount
         }
       };
-
-      // 标记停手玩家
-      if (player === 'creator') {
-        updatedState.creator = {
-          ...state.creator,
-          passed: true
-        };
-      } else {
-        updatedState.joiner = {
-          ...state.joiner,
-          passed: true
-        };
-      }
-
-      return updatedState;
     }
 
     case 'GAME_ENDED': {
@@ -143,26 +149,19 @@ function gameReducer(state, action) {
     }
 
     case 'UPDATE_BACKUP_TIME': {
-      // 同步后备时间（来自广播中的playerState）
-      const { role, backupTime } = action.payload;
+      // 同步备用时间
+      const { playerId, backupTime } = action.payload;
       
-      if (role === 'creator') {
-        return {
-          ...state,
-          creator: {
-            ...state.creator,
+      return {
+        ...state,
+        playerStates: {
+          ...state.playerStates,
+          [playerId]: {
+            ...state.playerStates[playerId],
             backupTime
           }
-        };
-      } else {
-        return {
-          ...state,
-          joiner: {
-            ...state.joiner,
-            backupTime
-          }
-        };
-      }
+        }
+      };
     }
 
     default:
@@ -173,11 +172,11 @@ function gameReducer(state, action) {
 // 初始游戏状态
 const initialGameState = {
   config: null,
-  players: null,
+  players: [],
+  playerStates: {},
+  colors: {},
   progress: null,
   board: Array(14).fill(null).map(() => Array(14).fill(0)),
-  creator: null,
-  joiner: null,
   winner: null,
   finalScores: null,
   penalties: null,
@@ -202,25 +201,26 @@ export function useGameRoom(roomId) {
   const lastPongTimeRef = useRef(Date.now());
   const heartbeatTimeout = 30000; // 30秒无响应视为断线
   
-  // 用户角色
-  const myRoleRef = useRef(null);
+  // 用户ID
+  const myPlayerIdRef = useRef(null);
 
-  // === 确定用户角色 ===
-  const determineRole = useCallback((players) => {
+  // === 确定用户ID ===
+  const determinePlayerId = useCallback((players) => {
     const user = getUser();
     if (!user) {
       setError('未找到用户信息');
       return null;
     }
 
-    if (players?.creator?.userId === user.id) {
-      return 'creator';
-    } else if (players?.joiner?.userId === user.id) {
-      return 'joiner';
-    } else {
-      setError('您不属于此房间');
-      return null;
+    // 遍历玩家数组查找匹配
+    for (let i = 0; i < players.length; i++) {
+      if (players[i] && players[i].userId === user.id) {
+        return `p${i+1}`; // 返回玩家ID (p1, p2, p3, p4)
+      }
     }
+    
+    setError('您不属于此房间');
+    return null;
   }, []);
 
   // === 请求游戏状态 ===
@@ -235,11 +235,17 @@ export function useGameRoom(roomId) {
           type: 'SET_INITIAL_STATE',
           payload: response.data.state
         });
+        
+        // 确定玩家ID
+        const playerId = determinePlayerId(response.data.state.players);
+        if (playerId) {
+          myPlayerIdRef.current = playerId;
+        }
       }
     } catch (err) {
       console.error('[useGameRoom] 获取状态失败:', err);
     }
-  }, [roomId]);
+  }, [roomId, determinePlayerId]);
 
   // === 处理广播消息 ===
   const handleBroadcast = useCallback((data) => {
@@ -253,30 +259,42 @@ export function useGameRoom(roomId) {
           payload: data 
         });
         
-        // 确定角色
-        const role = determineRole(data.players);
-        if (role) {
-          myRoleRef.current = role;
-          console.log('[useGameRoom] 角色确认:', role);
+        // 确定玩家ID
+        const playerId = determinePlayerId(data.players);
+        if (playerId) {
+          myPlayerIdRef.current = playerId;
+          console.log('[useGameRoom] 玩家ID确认:', playerId);
         }
         break;
       }
 
       case 'player_joined': {
         // 玩家加入
+        const { playerIndex, playerInfo, updatedPlayers, playerCount, requiredCount } = data;
+        
+        // 更新整个玩家列表，而不仅是单个玩家
         dispatch({ 
           type: 'PLAYER_JOINED', 
-          payload: data.joiner 
+          payload: {
+            playerIndex,
+            playerInfo,
+            updatedPlayers: data.updatedPlayers || undefined, // 可能后端会提供完整的更新列表
+            playerCount,
+            requiredCount
+          }
         });
         
-        // 如果自己刚加入，确定角色
-        if (!myRoleRef.current) {
-          const user = getUser();
-          if (data.joiner?.userId === user?.id) {
-            myRoleRef.current = 'joiner';
-            console.log('[useGameRoom] 角色确认: joiner');
+        // 如果自己刚加入，确定ID
+        if (!myPlayerIdRef.current) {
+          const playerId = determinePlayerId(data.updatedPlayers || [...state.players]);
+          if (playerId) {
+            myPlayerIdRef.current = playerId;
+            console.log('[useGameRoom] 加入后确定玩家ID:', playerId);
           }
         }
+        
+        // 重要：获取最新完整游戏状态以确保UI更新
+        fetchGameState();
         break;
       }
 
@@ -293,12 +311,13 @@ export function useGameRoom(roomId) {
         dispatch({ 
           type: 'MOVE_MADE', 
           payload: {
-            player: data.player,
+            playerId: data.playerId,
             pieceIndex: data.pieceIndex,
             nextPlayer: data.nextPlayer,
             currentRound: data.currentRound,
             playerState: data.playerState,
-            boardState: data.boardState // 后端返回完整棋盘
+            boardState: data.boardState,
+            activePlayerCount: data.activePlayerCount
           }
         });
         break;
@@ -309,9 +328,10 @@ export function useGameRoom(roomId) {
         dispatch({ 
           type: 'PLAYER_PASSED', 
           payload: {
-            player: data.player,
+            playerId: data.playerId,
             nextPlayer: data.nextPlayer,
-            currentRound: data.currentRound
+            currentRound: data.currentRound,
+            activePlayerCount: data.activePlayerCount
           }
         });
         break;
@@ -346,7 +366,7 @@ export function useGameRoom(roomId) {
       default:
         console.warn('[useGameRoom] 未知消息类型:', data.type);
     }
-  }, [determineRole, fetchGameState]);
+  }, [determinePlayerId, fetchGameState]);
 
   // === 启动心跳 ===
   const startHeartbeat = useCallback(() => {
@@ -524,8 +544,8 @@ export function useGameRoom(roomId) {
     wsConnected,
     error,
     
-    // 用户角色
-    myRole: myRoleRef.current,
+    // 用户角色（改为playerId）
+    myPlayerId: myPlayerIdRef.current,
     
     // 操作方法
     sendMove,

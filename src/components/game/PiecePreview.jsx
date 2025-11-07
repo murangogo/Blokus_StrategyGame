@@ -6,7 +6,7 @@ function PiecePreview({
   pieceId,      // 选中的棋子ID
   rotation,     // 旋转次数 (0-3)
   flipped,      // 是否翻转
-  myRole        // 我的角色
+  myColor       // 改为 myColor 对象
 }) {
   // 如果没有选中棋子
   if (pieceId === null || pieceId === undefined) {
@@ -31,10 +31,6 @@ function PiecePreview({
   
   // 获取棋子信息
   const pieceInfo = PIECES[pieceId];
-
-  // 根据角色决定颜色
-  const cellColor = myRole === 'creator' ? 'bg-[#FFB8C2]' : 'bg-[#B8CCFF]';
-  const borderColor = myRole === 'creator' ? 'border-red-300' : 'border-blue-300';
 
   // 计算网格大小（根据棋子实际大小动态调整）
   const rows = shape.length;
@@ -83,13 +79,18 @@ function PiecePreview({
                   className={`
                     ${getCellSize()}
                     ${cell === 1 
-                      ? `${cellColor} ${borderColor} border-2 rounded shadow-sm 
+                      ? `border-2 rounded shadow-sm 
                         ${isAnchor ? 'ring-4 ring-offset-1 ring-yellow-400' : ''}` 
                       : 'bg-transparent'
                     }
                     transition-all duration-200
                     relative
                   `}
+                  style={cell === 1 ? {
+                    backgroundColor: myColor.value,
+                    opacity: 0.7,
+                    borderColor: `${myColor.value}99`
+                  } : {}}
                 >
                   {isAnchor && cell === 1 && (
                     <div className="absolute inset-0 flex items-center justify-center">

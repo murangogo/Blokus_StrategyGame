@@ -1,12 +1,14 @@
 // 路径：src/components/game/GameBoard.jsx
-import { getPlayerId, getLatestMove, isLatestMoveCell, getCellColorClass } from '../../utils/gameHelpers';
+import { getLatestMove, isLatestMoveCell } from '../../utils/gameHelpers';
 import { getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
 import { useMemo, useState } from 'react';
 
 function GameBoard({ 
   board,            // 棋盘状态 {board: [[]], moves: []}
   trialPosition,    // 试下位置 {x, y, shape}
-  myRole,           // 我的角色
+  myPlayerId,       // 我的玩家ID (p1/p2/p3/p4)
+  myColor,          // 新增: 我的颜色对象
+  boardSize = 14,   // 新增: 棋盘大小 (14/17/20)
   onCellClick,      // 点击格子回调
   disabled = false, // 是否禁用
   selectedPiece,    // 选中的棋子
@@ -48,6 +50,31 @@ function GameBoard({
     setHoverPosition(null);
   };
 
+  // 获取棋子颜色
+  const getColorForCell = (cellValue, isLatest, isTrial, isHover) => {
+    // 如果是试下或悬浮
+    if (isTrial || isHover) {
+      return {
+        backgroundColor: `${myColor.value}80` // 半透明色
+      };
+    }
+
+    // 空格子
+    if (cellValue === 0) {
+      return {};
+    }
+
+    // 获取玩家颜色
+    const colorId = cellValue;
+    const playerColor = `var(--player-color-${colorId})`;
+    
+    return {
+      backgroundColor: isLatest 
+        ? `var(--player-color-${colorId}-bright)` // 亮色（最新落子）
+        : playerColor
+    };
+  };
+
   // 渲染单个格子
   const renderCell = (x, y) => {
     const cellValue = boardArray[y][x];
@@ -86,13 +113,8 @@ function GameBoard({
     // 检查是否是最新一步
     const isLatest = isLatestMoveCell(x, y, latestMove);
 
-    // 确定格子所属玩家（用于试下颜色）
-    const playerRole = (isTrial || isHover) ? myRole : (cellValue === 1 ? 'creator' : 'joiner');
-
-    // 获取颜色类名
-    const colorClass = isHover 
-      ? (myRole === 'creator' ? 'bg-[#FFD4DC]' : 'bg-[#D4E4FF]')  // 更浅的颜色
-      : getCellColorClass(cellValue, isLatest, isTrial, playerRole);
+    // 获取颜色样式
+    const colorStyle = getColorForCell(cellValue, isLatest, isTrial, isHover);
 
     // 是否可点击（空格子且未禁用且不是试下格子）
     const canClick = !disabled && cellValue === 0 && !isTrial;
@@ -104,30 +126,53 @@ function GameBoard({
         onMouseEnter={() => handleMouseMove(x, y)}
         className={`
           aspect-square border border-gray-300
-          ${colorClass}
+          ${cellValue === 0 ? 'bg-white hover:bg-gray-50' : ''}
           ${canClick && hoverShapeData ? 'cursor-pointer' : 'cursor-default'}
           ${isTrial ? 'opacity-70 animate-pulse' : ''}
           ${isHover ? 'opacity-60' : ''}
           ${isLatest && !isTrial && !isHover ? 'ring-2 ring-offset-1 ring-yellow-400' : ''}
           transition-all duration-100
         `}
+        style={colorStyle}
       />
     );
   };
 
+  // 生成CSS变量用于定义玩家颜色
+  const colorVars = {
+    '--player-color-1': '#FF8294',            // 红色-创建者
+    '--player-color-2': '#82A6FF',            // 蓝色-加入者A
+    '--player-color-3': '#82D282',            // 绿色-加入者B
+    '--player-color-4': '#FFB982',            // 橙色-加入者C
+    '--player-color-1-bright': '#FF4D66',     // 亮红色
+    '--player-color-2-bright': '#4D80FF',     // 亮蓝色
+    '--player-color-3-bright': '#4DC24D',     // 亮绿色
+    '--player-color-4-bright': '#FF9D4D',     // 亮橙色
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
+    <div className="bg-white rounded-xl shadow-lg p-6" style={colorVars}>
       {/* 棋盘标题和图例 */}
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-xl font-semibold text-gray-800">棋盘</h3>
-        <div className="flex items-center gap-4 text-sm">
+        <h3 className="text-xl font-semibold text-gray-800">
+          棋盘 ({boardSize}×{boardSize})
+        </h3>
+        <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-[#FF8294] rounded border border-gray-300"></div>
-            <span className="text-gray-600">创建者</span>
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#FF8294' }}></div>
+            <span className="text-gray-600">红</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-[#82A6FF] rounded border border-gray-300"></div>
-            <span className="text-gray-600">加入者</span>
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#82A6FF' }}></div>
+            <span className="text-gray-600">蓝</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#82D282' }}></div>
+            <span className="text-gray-600">绿</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#FFB982' }}></div>
+            <span className="text-gray-600">橙</span>
           </div>
         </div>
       </div>
@@ -137,12 +182,12 @@ function GameBoard({
         <div 
           className="grid gap-0 w-full aspect-square"
           style={{ 
-            gridTemplateColumns: 'repeat(14, 1fr)',
-            gridTemplateRows: 'repeat(14, 1fr)'
+            gridTemplateColumns: `repeat(${boardSize}, 1fr)`,
+            gridTemplateRows: `repeat(${boardSize}, 1fr)`
           }}
         >
-          {Array.from({ length: 14 }, (_, y) =>
-            Array.from({ length: 14 }, (_, x) => renderCell(x, y))
+          {Array.from({ length: boardSize }, (_, y) =>
+            Array.from({ length: boardSize }, (_, x) => renderCell(x, y))
           )}
         </div>
       </div>
@@ -158,6 +203,15 @@ function GameBoard({
         <div className="mt-4 text-center">
           <p className="text-sm text-blue-600">
             试下位置: ({trialPosition.x}, {trialPosition.y}) - 点击"确定下棋"完成落子
+          </p>
+        </div>
+      )}
+
+      {/* 新增: 我的回合且无操作状态的提示 */}
+      {!trialPosition && !hoverPosition && !disabled && (
+        <div className="mt-4 text-center">
+          <p className="text-sm text-green-600">
+            轮到您下棋了，请从下方选择棋子后点击棋盘
           </p>
         </div>
       )}

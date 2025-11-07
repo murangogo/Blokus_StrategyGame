@@ -70,7 +70,14 @@ export function getPieceTransforms(pieceId, rotation = 0, flipped = false) {
   return shape;
 }
 
-// 检查棋子是否超出边界
+/**
+ * 检查棋子是否超出边界
+ * @param {array} shape - 棋子形状
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} boardSize - 棋盘大小
+ * @returns {boolean} 是否超出边界
+ */
 export function isOutOfBounds(shape, x, y, boardSize = 14) {
   for (let i = 0; i < shape.length; i++) {
     for (let j = 0; j < shape[i].length; j++) {
@@ -102,12 +109,24 @@ export function isOverlapping(shape, x, y, board) {
   return false;
 }
 
-// 检查是否符合角对角规则（至少有一个角相邻，没有边相邻）
-export function isValidPlacement(shape, x, y, board, playerId, isFirstMove) {
+/**
+ * 检查是否符合角对角规则（至少有一个角相邻，没有边相邻）
+ * @param {array} shape - 棋子形状
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {array} board - 棋盘状态
+ * @param {number} playerId - 玩家ID (1-4)
+ * @param {boolean} isFirstMove - 是否首步棋
+ * @param {number} boardSize - 棋盘大小 (14/17/20)
+ * @returns {boolean} 是否符合规则
+ */
+export function isValidPlacement(shape, x, y, board, playerId, isFirstMove, boardSize = 14) {
   // 第一步必须在角落
   if (isFirstMove) {
+    // 根据棋盘大小计算角落位置
+    const maxIdx = boardSize - 1;
     const corners = [
-      [0, 0], [0, 13], [13, 0], [13, 13]
+      [0, 0], [0, maxIdx], [maxIdx, 0], [maxIdx, maxIdx]
     ];
     
     let hasCorner = false;
@@ -143,7 +162,7 @@ export function isValidPlacement(shape, x, y, board, playerId, isFirstMove) {
         ];
         
         for (const [ey, ex] of edges) {
-          if (ey >= 0 && ey < 14 && ex >= 0 && ex < 14) {
+          if (ey >= 0 && ey < boardSize && ex >= 0 && ex < boardSize) {
             if (board[ey][ex] === playerId) {
               return false; // 边相邻，不合法
             }
@@ -157,7 +176,7 @@ export function isValidPlacement(shape, x, y, board, playerId, isFirstMove) {
         ];
         
         for (const [cy, cx] of corners) {
-          if (cy >= 0 && cy < 14 && cx >= 0 && cx < 14) {
+          if (cy >= 0 && cy < boardSize && cx >= 0 && cx < boardSize) {
             if (board[cy][cx] === playerId) {
               hasCornerAdjacent = true;
             }

@@ -54,8 +54,9 @@ export const authAPI = {
 };
 
 export const gameAPI = {
-  createRoom: (limitTime) => 
-    api.post('/game/create', { limitTime }),
+  // 更新createRoom方法以支持多人游戏参数
+  createRoom: (limitTime, backupTime, playerCount, boardSize) => 
+    api.post('/game/create', { limitTime, backupTime, playerCount, boardSize }),
   joinRoom: (roomId) => 
     api.post(`/game/join/${roomId}`),
   getState: (roomId) => 
@@ -65,8 +66,8 @@ export const gameAPI = {
 };
 
 export const historyAPI = {
-  getList: () => 
-    api.get('/history/list'),
+  getList: (page = 1, size = 15) => 
+    api.get(`/history/list?page=${page}&size=${size}`),
   getDetail: (historyId) => 
     api.get(`/history/${historyId}`)
 };

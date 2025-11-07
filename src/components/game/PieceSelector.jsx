@@ -5,17 +5,17 @@ function PieceSelector({
   pieces,           // 已使用棋子数组 [true, false, ...]
   selectedPiece,    // 当前选中的棋子ID
   onSelect,         // 选择棋子回调
-  myRole            // 我的角色
+  myColor           // 修改: 使用myColor替代myRole
 }) {
-  // 根据角色决定颜色
+  // 根据颜色值决定样式
   const getColorClass = (isUsed, isSelected) => {
     if (isUsed) {
       return 'bg-gray-200 cursor-not-allowed opacity-50';
     }
     if (isSelected) {
-      return myRole === 'creator' 
-        ? 'bg-red-100 border-red-500 border-2 cursor-pointer'
-        : 'bg-blue-100 border-blue-500 border-2 cursor-pointer';
+      // 使用myColor对象中的值动态生成样式
+      const borderColor = myColor.value.replace('#', '');
+      return `bg-opacity-20 border-2 cursor-pointer bg-[${myColor.value}] border-[${myColor.value}]`;
     }
     return 'bg-white hover:bg-gray-50 border-gray-300 border cursor-pointer hover:border-gray-400';
   };
@@ -39,12 +39,10 @@ function PieceSelector({
       return 'w-2 h-2';
     };
 
-    // 棋子颜色
+    // 棋子颜色 - 使用动态颜色
     const pieceColor = isUsed 
       ? 'bg-gray-400' 
-      : myRole === 'creator' 
-        ? 'bg-[#FFB8C2]' 
-        : 'bg-[#B8CCFF]';
+      : `bg-[${myColor.value}] bg-opacity-70`;
 
     return (
       <div
@@ -75,6 +73,7 @@ function PieceSelector({
                   ${getCellSize()}
                   ${cell === 1 ? `${pieceColor} rounded-sm` : 'bg-transparent'}
                 `}
+                style={cell === 1 && !isUsed ? { backgroundColor: myColor.value, opacity: 0.7 } : {}}
               />
             ))
           )}
@@ -97,10 +96,10 @@ function PieceSelector({
         {/* 选中标记 */}
         {isSelected && !isUsed && (
           <div className="absolute -top-1 -right-1">
-            <div className={`
-              w-6 h-6 rounded-full flex items-center justify-center
-              ${myRole === 'creator' ? 'bg-red-500' : 'bg-blue-500'}
-            `}>
+            <div 
+              className="w-6 h-6 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: myColor.value }}
+            >
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
@@ -155,7 +154,10 @@ function PieceSelector({
           <span>已使用</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-4 h-4 rounded ${myRole === 'creator' ? 'bg-red-100 border-red-500 border-2' : 'bg-blue-100 border-blue-500 border-2'}`}></div>
+          <div className="w-4 h-4 rounded" style={{ 
+            backgroundColor: `${myColor.value}20`,
+            border: `2px solid ${myColor.value}` 
+          }}></div>
           <span>已选中</span>
         </div>
       </div>

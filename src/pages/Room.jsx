@@ -16,7 +16,7 @@ import {
   canPlacePiece, 
   getNewBoard, 
   calculateButtonStates,
-  getPlayerId 
+  getPlayerColorId
 } from '../utils/gameHelpers';
 
 import { getPieceTransforms, calculatePieceOffset } from '../utils/pieces';
@@ -30,7 +30,7 @@ function Room() {
     gameState,
     wsConnected,
     error,
-    myRole,
+    myPlayerId,  // 变更: 使用playerId而不是role
     sendMove,
     sendPass
   } = useGameRoom(roomId);
@@ -45,8 +45,9 @@ function Room() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // === 获取我的状态 ===
-  const myState = myRole === 'creator' ? gameState.creator : gameState.joiner;
-  const isMyTurn = gameState.progress?.currentPlayer === myRole;
+  const myState = gameState?.playerStates?.[myPlayerId];
+  const isMyTurn = gameState.progress?.currentPlayer === myPlayerId;
+  const boardSize = gameState.config?.boardSize || 14;
 
   // === 计时器 ===
   const {
@@ -69,7 +70,7 @@ function Room() {
   // === 按钮状态 ===
   const buttonStates = calculateButtonStates(
     gameState,
-    myRole,
+    myPlayerId,
     selectedPiece,
     trialPosition
   );
@@ -115,7 +116,7 @@ function Room() {
       return;
     }
 
-    // 获取当前棋子形状及其偏移
+    // 获取当前棋子形状及其锚点偏移
     const shape = getPieceTransforms(selectedPiece, rotation, flipped);
     const offset = calculatePieceOffset(shape);
     
@@ -131,7 +132,7 @@ function Room() {
       rotation,
       flipped,
       gameState.board.board || gameState.board,
-      myRole,
+      myPlayerId,
       myState
     );
 
@@ -164,7 +165,8 @@ function Room() {
         trialPosition.y,
         rotation,
         flipped,
-        myRole
+        myPlayerId, 
+        myState?.colorId  // 使用玩家的颜色ID
       );
 
       // 发送WebSocket消息
@@ -241,7 +243,6 @@ function Room() {
   // === 游戏结束处理 ===
   useEffect(() => {
     if (gameState.config?.gameStatus === 'finished') {
-      // 游戏结束
       console.log('游戏结束', gameState.winner, gameState.finalScores);
     }
   }, [gameState.config?.gameStatus, gameState.winner, gameState.finalScores]);
@@ -270,7 +271,7 @@ function Room() {
   }
 
   // === 加载状态 ===
-  if (!wsConnected || !gameState.config || !myRole) {
+  if (!wsConnected || !gameState.config || !myPlayerId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
@@ -284,6 +285,9 @@ function Room() {
       </div>
     );
   }
+
+  // 获取当前玩家的颜色信息
+  const myColor = gameState.colors?.[myPlayerId] || { value: "#FF8294" };
 
   // === 主渲染 ===
   return (
@@ -303,23 +307,30 @@ function Room() {
           
           <div className="text-sm text-gray-600">
             房间号: <span className="font-mono font-semibold">{roomId}</span>
+            {gameState.config.boardSize && (
+              <span className="ml-3 text-gray-500">
+                棋盘: {gameState.config.boardSize}×{gameState.config.boardSize}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 主内容区 - 左右两栏布局 */}
+        {/* 主内容区 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 左侧 */}
           <div className="space-y-6">
             <GameStatus
               gameState={gameState}
-              myRole={myRole}
+              myPlayerId={myPlayerId}
               myState={myState}
             />
             
             <GameBoard
               board={gameState.board}
               trialPosition={trialPosition}
-              myRole={myRole}
+              myPlayerId={myPlayerId}
+              myColor={myColor}
+              boardSize={boardSize}
               onCellClick={handleBoardClick}
               disabled={!isMyTurn || gameState.config?.gameStatus !== 'playing'}
               selectedPiece={selectedPiece}  
@@ -342,34 +353,36 @@ function Room() {
               warningLevel={warningLevel}
               buttonStates={buttonStates}
               onStartGame={handleStartGame}
-              myRole={myRole}                      
+              myPlayerId={myPlayerId}                      
               gameStatus={gameState.config?.gameStatus} 
+              gameConfig={gameState.config}  // 新增: 传递游戏配置
+              players={gameState.players}    // 新增: 传递玩家列表
             />
 
-          {/* 棋子预览和操作按钮并排 */}
-          <div className="grid grid-cols-2 gap-6">
-            <PiecePreview
-              pieceId={selectedPiece}
-              rotation={rotation}
-              flipped={flipped}
-              myRole={myRole}
-            />
+            {/* 棋子预览和操作按钮并排 */}
+            <div className="grid grid-cols-2 gap-6">
+              <PiecePreview
+                pieceId={selectedPiece}
+                rotation={rotation}
+                flipped={flipped}
+                myColor={myColor}
+              />
 
-            <GameControls
-              buttonStates={buttonStates}
-              onConfirmMove={handleConfirmMove}
-              onRotate={handleRotate}
-              onFlip={handleFlip}
-              onPass={handlePass}
-              onClearTrial={handleClearTrial}
-            />
-          </div>
+              <GameControls
+                buttonStates={buttonStates}
+                onConfirmMove={handleConfirmMove}
+                onRotate={handleRotate}
+                onFlip={handleFlip}
+                onPass={handlePass}
+                onClearTrial={handleClearTrial}
+              />
+            </div>
 
             <PieceSelector
               pieces={myState?.pieces || Array(21).fill(false)}
               selectedPiece={selectedPiece}
               onSelect={handlePieceSelect}
-              myRole={myRole}
+              myColor={myColor}
             />
           </div>
         </div>

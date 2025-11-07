@@ -1,22 +1,13 @@
 // 路径：src/components/game/GameStatus.jsx
-import { 
-  getGameStatusText, 
-  getRoundStatusText,
-  getPlayerId 
-} from '../../utils/gameHelpers';
-
 import { countPlayerSquares } from '../../utils/pieces';
 
-function GameStatus({ gameState, myRole, myState }) {
-  // 获取游戏状态文本
-  const gameStatusText = getGameStatusText(gameState, myRole);
-  
-  // 获取回合状态文本
-  const roundStatusText = getRoundStatusText(gameState, myRole);
+function GameStatus({ gameState, myPlayerId, myState }) {
+  // 获取我的颜色ID
+  const myColorId = myState?.colorId || parseInt(myPlayerId.substring(1));
 
   // 计算我的棋盘格数
   const mySquares = myState && gameState.board 
-    ? countPlayerSquares(gameState.board.board || gameState.board, getPlayerId(myRole))
+    ? countPlayerSquares(gameState.board.board || gameState.board, myColorId)
     : 0;
 
   // 我的惩罚格数
@@ -25,20 +16,43 @@ function GameStatus({ gameState, myRole, myState }) {
   // 最终得分（格数 - 惩罚）
   const myFinalScore = mySquares - myPenalty;
 
-  // 根据回合状态决定样式
-  const getRoundStatusStyle = () => {
-    if (!gameState.config || gameState.config.gameStatus !== 'playing') {
-      return 'bg-gray-100 text-gray-600 border-gray-300';
-    }
-
-    if (roundStatusText.includes('我的回合')) {
-      return 'bg-green-100 text-green-700 border-green-300';
-    } else if (roundStatusText.includes('对方回合')) {
-      return 'bg-blue-100 text-blue-700 border-blue-300';
-    } else if (roundStatusText.includes('已停手')) {
-      return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-    } else {
-      return 'bg-gray-100 text-gray-600 border-gray-300';
+  // 游戏状态文本
+  const getGameStatusText = () => {
+    if (!gameState.config) return '加载中...';
+    
+    const { gameStatus, playerCount = 0, requiredPlayerCount = 2, hasEnoughPlayers = false } = gameState.config;
+    
+    // 获取已加入玩家数量
+    const joinedPlayers = gameState.players?.filter(p => p !== null).length || 0;
+    
+    switch (gameStatus) {
+      case 'waiting':
+        if (myPlayerId === 'p1') { // 创建者
+          return hasEnoughPlayers || joinedPlayers >= requiredPlayerCount
+            ? '等待开始游戏'
+            : `等待其他玩家加入 (${joinedPlayers}/${requiredPlayerCount})`;
+        } else {
+          return '等待房主开始游戏';
+        }
+        
+      case 'playing':
+        return '游戏进行中';
+        
+      case 'finished':
+        const { winner } = gameState;
+        if (!winner) return '游戏结束';
+        
+        if (winner === 'draw') {
+          return '平局';
+        }
+        
+        // 获取赢家名字
+        const winnerIndex = parseInt(winner.substring(1)) - 1;
+        const winnerName = gameState.players[winnerIndex]?.account || '未知玩家';
+        return `${winnerName} 胜利`;
+      
+      default:
+        return '未知状态';
     }
   };
 
@@ -47,7 +61,7 @@ function GameStatus({ gameState, myRole, myState }) {
       {/* 游戏状态 - 最大最醒目 */}
       <div className="text-center">
         <h2 className="text-xl font-bold text-gray-800 mb-1">
-          {gameStatusText}
+          {getGameStatusText()}
         </h2>
         {gameState.config?.gameStatus === 'waiting' && (
           <p className="text-sm text-gray-500">
@@ -86,14 +100,54 @@ function GameStatus({ gameState, myRole, myState }) {
         </div>
       </div>
 
-      {/* 回合状态 - 突出显示 */}
-      {gameState.config?.gameStatus === 'playing' && (
-        <div className={`
-          rounded-lg p-4 text-center font-semibold text-lg
-          border-2 ${getRoundStatusStyle()}
-          transition-all duration-300
-        `}>
-          {roundStatusText}
+      {/* 新增: 玩家列表 - 水平展示 */}
+      {gameState.players && gameState.players.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {gameState.players.map((player, index) => {
+              if (!player) return null;
+              
+              const playerId = `p${index+1}`;
+              const isCurrentPlayer = gameState.progress?.currentPlayer === playerId;
+              const isMe = playerId === myPlayerId;
+              const color = gameState.colors?.[playerId]?.value || "#CCCCCC";
+              
+              return (
+                <div 
+                  key={playerId}
+                  className={`
+                    flex items-center p-2 rounded-lg
+                    ${isCurrentPlayer ? 'bg-gray-100 shadow-sm' : ''}
+                    ${isMe ? 'border border-dashed border-gray-300' : ''}
+                    transition-all duration-200
+                  `}
+                >
+                  {/* 玩家颜色指示器 */}
+                  <div 
+                    className="w-6 h-6 rounded-full flex-shrink-0 mr-2"
+                    style={{ backgroundColor: color }}
+                  >
+                    {isCurrentPlayer && (
+                      <div className="w-full h-full flex items-center justify-center animate-pulse">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* 玩家名称 */}
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-800">{player.account}</span>
+                    {isMe && <span className="ml-1 text-xs text-gray-500">(我)</span>}
+                    {gameState.playerStates?.[playerId]?.passed && (
+                      <span className="ml-1 text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-600 rounded">
+                        已停手
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

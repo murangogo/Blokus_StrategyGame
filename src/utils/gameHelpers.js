@@ -18,6 +18,16 @@ export function getPlayerId(role) {
 }
 
 /**
+ * 获取玩家颜色ID (p1->1, p2->2, p3->3, p4->4)
+ * @param {string} playerId - 玩家ID
+ * @returns {number} 颜色ID
+ */
+export function getPlayerColorId(playerId) {
+  if (!playerId || typeof playerId !== 'string') return 1;
+  return parseInt(playerId.substring(1));
+}
+
+/**
  * 获取对手角色
  * @param {string} myRole - 我的角色
  * @returns {string} 对手角色
@@ -36,18 +46,18 @@ export function isFirstMove(playerState) {
 }
 
 /**
- * 检查棋子是否可以放置
+ * 检查棋子是否可以放置 (多人版)
  * @param {number} pieceId - 棋子ID
  * @param {number} x - X坐标
  * @param {number} y - Y坐标
- * @param {number} rotation - 旋转次数（0-3）
+ * @param {number} rotation - 旋转次数
  * @param {boolean} flipped - 是否翻转
  * @param {array} board - 棋盘状态
- * @param {string} role - 玩家角色
+ * @param {string} playerId - 玩家ID (p1, p2, p3, p4)
  * @param {object} playerState - 玩家状态
  * @returns {object} { valid: boolean, reason: string }
  */
-export function canPlacePiece(pieceId, x, y, rotation, flipped, board, role, playerState) {
+export function canPlacePiece(pieceId, x, y, rotation, flipped, board, playerId, playerState) {
   // 检查棋子是否已使用
   if (playerState?.pieces?.[pieceId]) {
     return { valid: false, reason: '该棋子已使用' };
@@ -56,8 +66,11 @@ export function canPlacePiece(pieceId, x, y, rotation, flipped, board, role, pla
   // 获取变换后的棋子形状
   const shape = getPieceTransforms(pieceId, rotation, flipped);
   
+  // 获取棋盘大小
+  const boardSize = board.length;
+  
   // 检查是否超出边界
-  if (isOutOfBounds(shape, x, y)) {
+  if (isOutOfBounds(shape, x, y, boardSize)) {
     return { valid: false, reason: '超出棋盘边界' };
   }
 
@@ -67,10 +80,10 @@ export function canPlacePiece(pieceId, x, y, rotation, flipped, board, role, pla
   }
 
   // 检查是否符合放置规则
-  const playerId = getPlayerId(role);
+  const colorId = getPlayerColorId(playerId);
   const firstMove = isFirstMove(playerState);
   
-  if (!isValidPlacement(shape, x, y, board, playerId, firstMove)) {
+  if (!isValidPlacement(shape, x, y, board, colorId, firstMove, boardSize)) {
     if (firstMove) {
       return { valid: false, reason: '首步棋必须占据一个角落' };
     } else {
@@ -82,20 +95,21 @@ export function canPlacePiece(pieceId, x, y, rotation, flipped, board, role, pla
 }
 
 /**
- * 计算放置棋子后的新棋盘
+ * 计算放置棋子后的新棋盘 (多人版)
  * @param {array} board - 当前棋盘
  * @param {number} pieceId - 棋子ID
  * @param {number} x - X坐标
  * @param {number} y - Y坐标
  * @param {number} rotation - 旋转次数
  * @param {boolean} flipped - 是否翻转
- * @param {string} role - 玩家角色
+ * @param {string} playerId - 玩家ID (p1, p2, p3, p4)
  * @returns {array} 新棋盘
  */
-export function getNewBoard(board, pieceId, x, y, rotation, flipped, role) {
+export function getNewBoard(board, pieceId, x, y, rotation, flipped, playerId) {
   const shape = getPieceTransforms(pieceId, rotation, flipped);
-  const playerId = getPlayerId(role);
-  return placePieceOnBoard(board, shape, x, y, playerId);
+  // 从playerId中提取数字作为棋盘上的值
+  const colorId = getPlayerColorId(playerId);
+  return placePieceOnBoard(board, shape, x, y, colorId);
 }
 
 /**
@@ -255,7 +269,7 @@ export function getRoundStatusText(gameState, myRole) {
  * @param {object|null} trialPosition - 试下位置
  * @returns {object} 按钮状态对象
  */
-export function calculateButtonStates(gameState, myRole, selectedPiece, trialPosition) {
+export function calculateButtonStates(gameState, myPlayerId, selectedPiece, trialPosition) {
   if (!gameState.config || !gameState.progress) {
     return {
       confirmMove: false,
@@ -267,16 +281,19 @@ export function calculateButtonStates(gameState, myRole, selectedPiece, trialPos
     };
   }
   
-  const { gameStatus } = gameState.config;
+  const { gameStatus, playerCount = 0, requiredPlayerCount = 2, hasEnoughPlayers = false } = gameState.config;
   const { currentPlayer } = gameState.progress;
-  const isMyTurn = currentPlayer === myRole;
+  const isMyTurn = currentPlayer === myPlayerId;
   
-  const myState = myRole === 'creator' ? gameState.creator : gameState.joiner;
-  const opponentState = myRole === 'creator' ? gameState.joiner : gameState.creator;
+  const myState = gameState.playerStates?.[myPlayerId];
   
-  const hasOpponent = myRole === 'creator' 
-    ? !!gameState.players?.joiner 
-    : !!gameState.players?.creator;
+  // 是否是房主（p1）
+  const isCreator = myPlayerId === 'p1';
+  
+  // 检查是否有足够的玩家加入
+  // 多重条件确保UI状态正确，这是修复问题2的关键
+  const joinedPlayers = gameState.players?.filter(p => p !== null).length || 0;
+  const hasMinPlayers = hasEnoughPlayers || joinedPlayers >= requiredPlayerCount;
 
   return {
     // 确定下棋：我的回合 + 有试下位置 + 游戏中
@@ -294,8 +311,8 @@ export function calculateButtonStates(gameState, myRole, selectedPiece, trialPos
     // 清除试下：有试下位置
     clearTrial: !!trialPosition,
     
-    // 开始游戏：我是创建者 + 有对手 + 等待状态
-    startGame: myRole === 'creator' && hasOpponent && gameStatus === 'waiting'
+    // 开始游戏：我是创建者 + 有足够玩家 + 等待状态 - 修复问题2
+    startGame: isCreator && hasMinPlayers && gameStatus === 'waiting'
   };
 }
 

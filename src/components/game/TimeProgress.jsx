@@ -11,8 +11,10 @@ function TimeProgress({
   warningLevel,      // 警告等级
   buttonStates,      // 按钮状态对象
   onStartGame,        // 开始游戏回调
-  myRole,           // 我的角色
-  gameStatus        // 游戏状态
+  myPlayerId,        // 我的玩家ID
+  gameStatus,        // 游戏状态
+  gameConfig,        // 新增: 游戏配置
+  players            // 新增: 玩家列表
 }) {
   // 根据警告等级决定动画效果
   const getProgressAnimation = () => {
@@ -33,11 +35,20 @@ function TimeProgress({
     if (gameStatus === 'playing' || gameStatus === 'finished') {
       return '已开始游戏！';
     }
+    
     if (buttonStates.startGame) {
       return '开始游戏';
     }
-    if (myRole == 'creator') {
-      return '等待对手加入...';
+    
+    if (myPlayerId === 'p1') {  // 房主
+      // 从props中获取玩家数量信息
+      const requiredPlayerCount = gameConfig?.requiredPlayerCount || 2;
+      const joinedPlayers = players?.filter(p => p !== null).length || 0;
+      const hasEnoughPlayers = joinedPlayers >= requiredPlayerCount;
+      
+      return hasEnoughPlayers 
+        ? '点击开始游戏' 
+        : `等待其他玩家加入 (${joinedPlayers}/${requiredPlayerCount})`;
     } else {
       return '等待房主开始游戏...';
     }

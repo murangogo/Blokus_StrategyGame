@@ -8,22 +8,28 @@ function History() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
   
-  const ITEMS_PER_PAGE = 20;
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalGames, setTotalGames] = useState(0);
+  const [pageSize] = useState(15); // 使用后端默认的每页15条
 
-  // 获取历史记录
+  // 获取历史记录（添加页码参数）
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    fetchHistory(currentPage);
+  }, [currentPage]); // 当页码变化时重新获取数据
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (page) => {
     try {
       setLoading(true);
-      const response = await historyAPI.getList();
+      const response = await historyAPI.getList(page, pageSize);
       
       if (response.data.success) {
-        setGames(response.data.data.games);
+        const { total, games, totalPages } = response.data.data;
+        setGames(games);
+        setTotalGames(total);
+        setTotalPages(totalPages);
       } else {
         setError('获取历史记录失败');
       }
@@ -61,12 +67,7 @@ function History() {
     }
   };
 
-  // 分页逻辑
-  const totalPages = Math.ceil(games.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentGames = games.slice(startIndex, endIndex);
-
+  // 页面导航
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -75,7 +76,7 @@ function History() {
   };
 
   // 加载状态
-  if (loading) {
+  if (loading && games.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
@@ -90,7 +91,7 @@ function History() {
   }
 
   // 错误状态
-  if (error) {
+  if (error && games.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
@@ -101,7 +102,7 @@ function History() {
             <h2 className="text-2xl font-bold text-gray-800 mb-2">加载失败</h2>
             <p className="text-red-600 mb-6">{error}</p>
             <button
-              onClick={fetchHistory}
+              onClick={() => fetchHistory(1)}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
             >
               重试
@@ -119,7 +120,7 @@ function History() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">历史记录</h1>
-            <p className="text-gray-600">共 {games.length} 场游戏</p>
+            <p className="text-gray-600">共 {totalGames} 场游戏</p>
           </div>
           <button
             onClick={() => navigate('/home')}
@@ -141,7 +142,7 @@ function History() {
         </div>
 
         {/* 游戏记录列表 */}
-        {currentGames.length === 0 ? (
+        {games.length === 0 ? (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center">
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -151,7 +152,7 @@ function History() {
           </div>
         ) : (
           <div className="space-y-3">
-            {currentGames.map((game) => (
+            {games.map((game) => (
               <div
                 key={game.id}
                 onClick={() => navigate(`/history/${game.id}`)}
@@ -166,11 +167,16 @@ function History() {
                     </span>
                   </div>
 
-                  {/* 对战用户 */}
+                  {/* 对战用户 - 使用versusText显示多人对战 */}
                   <div className="flex md:block items-center justify-between md:justify-start">
                     <span className="text-gray-500 text-xs md:hidden">对战:</span>
                     <span className="text-gray-800">
-                      {game.creatorAccount} <span className="text-gray-400">vs</span> {game.joinerAccount}
+                      {game.versusText || "未知对手"}
+                      {game.playerCount > 2 && (
+                        <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-600 text-xs rounded">
+                          {game.playerCount}人局
+                        </span>
+                      )}
                     </span>
                   </div>
 
@@ -189,7 +195,7 @@ function History() {
                       <span className={`font-semibold ${
                         game.winner ? 'text-green-600' : 'text-gray-600'
                       }`}>
-                        {game.winnerAccount || '平局'}
+                        {game.winner === 'draw' ? '平局' : game.winnerAccount || '未知'}
                       </span>
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -202,7 +208,7 @@ function History() {
           </div>
         )}
 
-        {/* 分页器 */}
+        {/* 分页器 - 使用后端提供的总页数 */}
         {totalPages > 1 && (
           <div className="mt-8 flex justify-center items-center gap-2">
             <button
@@ -217,19 +223,34 @@ function History() {
               上一页
             </button>
 
-            {[...Array(Math.min(5, totalPages))].map((_, index) => {
-              let pageNum;
+            {(() => {
+              // 计算要显示的页码
+              let pageNumbers = [];
+              
               if (totalPages <= 5) {
-                pageNum = index + 1;
+                // 总页数少于5，显示所有页码
+                pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
               } else if (currentPage <= 3) {
-                pageNum = index + 1;
+                // 当前页在前3页，显示1-5页
+                pageNumbers = [1, 2, 3, 4, 5];
               } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + index;
+                // 当前页在后3页，显示最后5页
+                pageNumbers = Array.from(
+                  { length: 5 }, 
+                  (_, i) => totalPages - 4 + i
+                );
               } else {
-                pageNum = currentPage - 2 + index;
+                // 当前页在中间，显示当前页及其前后2页
+                pageNumbers = [
+                  currentPage - 2,
+                  currentPage - 1,
+                  currentPage,
+                  currentPage + 1,
+                  currentPage + 2
+                ];
               }
-
-              return (
+              
+              return pageNumbers.map(pageNum => (
                 <button
                   key={pageNum}
                   onClick={() => goToPage(pageNum)}
@@ -241,8 +262,8 @@ function History() {
                 >
                   {pageNum}
                 </button>
-              );
-            })}
+              ));
+            })()}
 
             <button
               onClick={() => goToPage(currentPage + 1)}
@@ -255,6 +276,13 @@ function History() {
             >
               下一页
             </button>
+          </div>
+        )}
+        
+        {/* 加载中提示 - 当翻页时显示 */}
+        {loading && games.length > 0 && (
+          <div className="mt-4 text-center">
+            <p className="text-gray-500">加载中...</p>
           </div>
         )}
       </div>

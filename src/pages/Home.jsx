@@ -13,7 +13,12 @@ function Home() {
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [resultModalOpen, setResultModalOpen] = useState(false);
   
-  const [limitTime, setLimitTime] = useState('120');
+  // 新增参数状态
+  const [limitTime, setLimitTime] = useState('60');
+  const [backupTime, setBackupTime] = useState('180');
+  const [playerCount, setPlayerCount] = useState('2');
+  const [boardSize, setBoardSize] = useState('14');
+  
   const [roomIdInput, setRoomIdInput] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState('');
   
@@ -22,9 +27,19 @@ function Home() {
 
   // 创建房间
   const handleCreateRoom = async () => {
+    // 参数验证
     const time = parseInt(limitTime);
+    const backup = parseInt(backupTime);
+    const players = parseInt(playerCount);
+    const board = parseInt(boardSize);
+    
     if (isNaN(time) || time < 15 || time > 180) {
-      setError('请输入有效的时间（15-180秒）');
+      setError('请输入有效的回合时间（15-180秒）');
+      return;
+    }
+    
+    if (isNaN(backup) || backup < 60 || backup > 300) {
+      setError('请输入有效的备用时间（60-300秒）');
       return;
     }
 
@@ -32,13 +47,11 @@ function Home() {
     setError('');
 
     try {
-      const response = await gameAPI.createRoom(time);
+      const response = await gameAPI.createRoom(time, backup, players, board);
       
       if (response.data.success) {
         const roomId = response.data.data.roomId_create;
-
         console.log(response);
-        
         console.log(roomId);
 
         setCreatedRoomId(roomId);
@@ -94,6 +107,15 @@ function Home() {
     navigate('/login');
   };
 
+  // 重置创建房间表单
+  const resetCreateRoomForm = () => {
+    setLimitTime('60');
+    setBackupTime('180');
+    setPlayerCount('2');
+    setBoardSize('14');
+    setError('');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -102,9 +124,9 @@ function Home() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-gray-800 mb-2">
-                欢迎！{user?.account || '玩家'}
+                欢迎，{user?.account || '玩家'}
               </h1>
-              <p className="text-gray-500">角斗士棋 Blokus - 双人对战</p>
+              <p className="text-gray-500">角斗士棋 Blokus - 多人对战</p>
               <p className="text-gray-500">一个简单的策略游戏，缅怀一段短暂的时光。</p>
             </div>
             <button
@@ -122,8 +144,7 @@ function Home() {
           <button
             onClick={() => {
               setCreateModalOpen(true);
-              setError('');
-              setLimitTime('120');
+              resetCreateRoomForm();
             }}
             className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-all transform hover:scale-105 active:scale-95"
           >
@@ -177,9 +198,44 @@ function Home() {
         title="创建房间"
       >
         <div className="space-y-4">
+          {/* 玩家数量 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              每回合最大等待时间（秒）
+              游戏人数
+            </label>
+            <select
+              value={playerCount}
+              onChange={(e) => setPlayerCount(e.target.value)}
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
+            >
+              <option value="2">双人对战</option>
+              <option value="3">三人对战</option>
+              <option value="4">四人对战</option>
+            </select>
+          </div>
+          
+          {/* 棋盘大小 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              棋盘大小
+            </label>
+            <select
+              value={boardSize}
+              onChange={(e) => setBoardSize(e.target.value)}
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
+            >
+              <option value="14">14×14 (196格)</option>
+              <option value="17">17×17 (289格)</option>
+              <option value="20">20×20 (400格)</option>
+            </select>
+          </div>
+
+          {/* 回合时间限制 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              回合时间限制（秒）
             </label>
             <input
               type="number"
@@ -187,19 +243,39 @@ function Home() {
               onChange={(e) => setLimitTime(e.target.value)}
               disabled={loading}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
-              placeholder="默认120秒"
+              placeholder="默认60秒"
               min="15"
               max="180"
             />
             <p className="text-xs text-gray-500 mt-1">范围：15-180秒</p>
           </div>
+          
+          {/* 备用时间 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              备用时间（秒）
+            </label>
+            <input
+              type="number"
+              value={backupTime}
+              onChange={(e) => setBackupTime(e.target.value)}
+              disabled={loading}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition disabled:bg-gray-100"
+              placeholder="默认180秒"
+              min="60"
+              max="300"
+            />
+            <p className="text-xs text-gray-500 mt-1">范围：60-300秒</p>
+          </div>
 
+          {/* 错误提示 */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
+          {/* 按钮区域 */}
           <div className="flex gap-3">
             <button
               onClick={() => !loading && setCreateModalOpen(false)}
@@ -219,7 +295,7 @@ function Home() {
         </div>
       </Modal>
 
-      {/* 加入房间弹窗 */}
+      {/* 加入房间弹窗（不变） */}
       <Modal
         isOpen={joinModalOpen}
         onClose={() => !loading && setJoinModalOpen(false)}
@@ -265,7 +341,7 @@ function Home() {
         </div>
       </Modal>
 
-      {/* 创建成功结果弹窗 */}
+      {/* 创建成功结果弹窗（不变） */}
       <Modal
         isOpen={resultModalOpen}
         onClose={() => setResultModalOpen(false)}
