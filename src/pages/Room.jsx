@@ -1,5 +1,5 @@
 // 路径：src/pages/Room.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameRoom } from '../hooks/useGameRoom';
 import { useGameTimer } from '../hooks/useGameTimer';
@@ -11,6 +11,8 @@ import TimeProgress from '../components/game/TimeProgress';
 import PiecePreview from '../components/game/PiecePreview';
 import GameControls from '../components/game/GameControls';
 import PieceSelector from '../components/game/PieceSelector';
+import ScoreBoard from '../components/game/ScoreBoard';
+import GameResultModal from '../components/game/GameResultModal';
 
 import { 
   canPlacePiece, 
@@ -40,6 +42,8 @@ function Room() {
   const [rotation, setRotation] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [trialPosition, setTrialPosition] = useState(null); // {x, y, shape}
+  const [showScoreBoard, setShowScoreBoard] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
   
   // === 防抖状态（防止频繁点击）===
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -116,19 +120,31 @@ function Room() {
       return;
     }
 
-    // 获取当前棋子形状及其锚点偏移
+    // 获取当前棋子形状及锚点偏移
     const shape = getPieceTransforms(selectedPiece, rotation, flipped);
     const offset = calculatePieceOffset(shape);
     
-    // 用户点击的是锚点位置，需要减去偏移得到实际的左上角位置
+    // 用户点击的是锚点位置，需要减去偏移得到实际的左上角
     const actualX = x - offset.offsetX;
     const actualY = y - offset.offsetY;
 
-    // 使用实际的左上角位置进行验证
+    // 直接设置试下位置，不做合法性检查
+    setTrialPosition({
+      x: actualX,
+      y: actualY,
+      shape
+    });
+  };
+
+  // === 事件处理：确定下棋 ===
+  const handleConfirmMove = async () => {
+    if (!trialPosition || isSubmitting) return;
+
+    // 在确认下棋时进行合法性检查
     const validation = canPlacePiece(
       selectedPiece,
-      actualX,
-      actualY,
+      trialPosition.x,
+      trialPosition.y,
       rotation,
       flipped,
       gameState.board.board || gameState.board,
@@ -142,18 +158,6 @@ function Room() {
       return;
     }
 
-    // 保存试下位置时使用实际的左上角坐标
-    setTrialPosition({
-      x: actualX,
-      y: actualY,
-      shape
-    });
-  };
-
-  // === 事件处理：确定下棋 ===
-  const handleConfirmMove = async () => {
-    if (!trialPosition || isSubmitting) return;
-
     setIsSubmitting(true);
 
     try {
@@ -166,7 +170,7 @@ function Room() {
         rotation,
         flipped,
         myPlayerId, 
-        myState?.colorId  // 使用玩家的颜色ID
+        myState?.colorId
       );
 
       // 发送WebSocket消息
@@ -239,6 +243,30 @@ function Room() {
       setTimeout(() => setIsSubmitting(false), 500);
     }
   };
+
+
+  // === 计算游戏结果 ===
+  const getGameResult = useCallback(() => {
+    if (gameState.config?.gameStatus !== 'finished' || !gameState.winner) {
+      return null;
+    }
+    
+    if (gameState.winner === 'draw') {
+      return 'draw';
+    }
+    
+    return gameState.winner === myPlayerId ? 'win' : 'lose';
+  }, [gameState.config?.gameStatus, gameState.winner, myPlayerId]);
+
+  //=== 显示结果弹窗 ===
+  useEffect(() => {
+    if (gameState.config?.gameStatus === 'finished' && gameState.winner && !showResultModal) {
+      // 短暂延迟，确保状态已更新
+      setTimeout(() => {
+        setShowResultModal(true);
+      }, 500);
+    }
+  }, [gameState.config?.gameStatus, gameState.winner]);
 
   // === 游戏结束处理 ===
   useEffect(() => {
@@ -324,6 +352,26 @@ function Room() {
               myPlayerId={myPlayerId}
               myState={myState}
             />
+
+            {/* 游戏结束时显示查看计分板按钮 */}
+            {gameState.config?.gameStatus === 'finished' && (
+              <button
+                onClick={() => setShowScoreBoard(!showScoreBoard)}
+                className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+              >
+                {showScoreBoard ? '隐藏计分板' : '查看计分板'}
+              </button>
+            )}
+          
+            {/* 条件显示计分板 */}
+            {showScoreBoard && gameState.config?.gameStatus === 'finished' && (
+              <ScoreBoard 
+                players={gameState.players}
+                scores={gameState.winner ? gameState.finalScores : {}}
+                penalties={gameState.penalties || {}}
+                colors={gameState.colors}
+              />
+            )}
             
             <GameBoard
               board={gameState.board}
@@ -385,6 +433,17 @@ function Room() {
               myColor={myColor}
             />
           </div>
+
+          {/* 添加游戏结果弹窗 */}
+          <GameResultModal
+            isOpen={showResultModal}
+            onClose={() => setShowResultModal(false)}
+            result={getGameResult()}
+            myPlayerId={myPlayerId}
+            winner={gameState.winner}
+            players={gameState.players}
+          />
+
         </div>
       </div>
     </div>

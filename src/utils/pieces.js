@@ -217,11 +217,6 @@ export function countPlayerSquares(board, playerId) {
   return count;
 }
 
-// 获取玩家ID（creator=1, joiner=2）
-export function getPlayerId(role) {
-  return role === 'creator' ? 1 : 2;
-}
-
 /**
  * 计算棋子形状的锚点偏移
  * 返回第一个实际方块的位置作为锚点

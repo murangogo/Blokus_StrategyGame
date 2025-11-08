@@ -94,6 +94,15 @@ function GameBoard({
       }
     }
 
+    // 简单验证试下位置是否超出边界或重叠（仅视觉提示，不阻止用户操作）
+    let isInvalidTrial = false;
+    if (isTrial) {
+      const cellValue = boardArray[y][x];
+      if (cellValue !== 0) {
+        isInvalidTrial = true; // 与已有棋子重叠
+      }
+    }
+
     // 检查是否是鼠标悬浮位置
     let isHover = false;
     if (!trialPosition && hoverPosition && hoverShapeData) {
@@ -128,7 +137,7 @@ function GameBoard({
           aspect-square border border-gray-300
           ${cellValue === 0 ? 'bg-white hover:bg-gray-50' : ''}
           ${canClick && hoverShapeData ? 'cursor-pointer' : 'cursor-default'}
-          ${isTrial ? 'opacity-70 animate-pulse' : ''}
+          ${isTrial ? `opacity-70 ${isInvalidTrial ? 'border-red-500 border-2' : 'animate-pulse'}` : ''}
           ${isHover ? 'opacity-60' : ''}
           ${isLatest && !isTrial && !isHover ? 'ring-2 ring-offset-1 ring-yellow-400' : ''}
           transition-all duration-100

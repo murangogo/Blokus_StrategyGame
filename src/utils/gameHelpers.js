@@ -9,15 +9,6 @@ import {
 } from './pieces';
 
 /**
- * 获取玩家ID（用于棋盘数组）
- * @param {string} role - 'creator' 或 'joiner'
- * @returns {number} 1 或 2
- */
-export function getPlayerId(role) {
-  return role === 'creator' ? 1 : 2;
-}
-
-/**
  * 获取玩家颜色ID (p1->1, p2->2, p3->3, p4->4)
  * @param {string} playerId - 玩家ID
  * @returns {number} 颜色ID
@@ -25,15 +16,6 @@ export function getPlayerId(role) {
 export function getPlayerColorId(playerId) {
   if (!playerId || typeof playerId !== 'string') return 1;
   return parseInt(playerId.substring(1));
-}
-
-/**
- * 获取对手角色
- * @param {string} myRole - 我的角色
- * @returns {string} 对手角色
- */
-export function getOpponentRole(myRole) {
-  return myRole === 'creator' ? 'joiner' : 'creator';
 }
 
 /**
@@ -155,113 +137,6 @@ export function isLatestMoveCell(x, y, latestMove) {
 }
 
 /**
- * 计算玩家得分（格数 - 惩罚）
- * @param {array} board - 棋盘
- * @param {string} role - 角色
- * @param {number} penalty - 惩罚格数
- * @returns {number} 最终得分
- */
-export function calculateScore(board, role, penalty) {
-  const playerId = getPlayerId(role);
-  const squares = countPlayerSquares(board, playerId);
-  return Math.max(0, squares - penalty);
-}
-
-/**
- * 获取游戏状态文本
- * @param {object} gameState - 游戏状态
- * @param {string} myRole - 我的角色
- * @returns {string} 状态文本
- */
-export function getGameStatusText(gameState, myRole) {
-  if (!gameState.config) return '加载中...';
-  
-  const { gameStatus } = gameState.config;
-
-  // 获取玩家账号名称
-  const creatorName = gameState.players?.creator?.account || '创建者';
-  const joinerName = gameState.players?.joiner?.account || '加入者';
-  
-  switch (gameStatus) {
-    case 'waiting':
-      if (myRole === 'creator') {
-        return gameState.players?.joiner 
-          ? '等待开始游戏' 
-          : '等待对手加入';
-      } else {
-        return `等待 ${creatorName} 开始游戏`;
-      }
-      
-    case 'playing':
-      return '游戏进行中';
-      
-    case 'finished': {
-      const { winner, finalScores, penalties } = gameState;
-      
-      if (!finalScores) return '游戏结束';
-      
-      const creatorFinal = finalScores.creator;
-      const joinerFinal = finalScores.joiner;
-      
-      const creatorPenalty = penalties?.creator || 0;
-      const joinerPenalty = penalties?.joiner || 0;
-      
-      if (winner === 'draw') {
-        return `平局 - ${creatorName}: ${creatorFinal}格(惩罚${creatorPenalty}格), ${joinerName}: ${joinerFinal}格(惩罚${joinerPenalty}格)`;
-      }
-      
-      const winnerName = winner === 'creator' ? creatorName : joinerName;
-      return `${winnerName} 胜利 - ${creatorName}: ${creatorFinal}格(惩罚${creatorPenalty}格), ${joinerName}: ${joinerFinal}格(惩罚${joinerPenalty}格)`;
-    }
-      
-    default:
-      return '未知状态';
-  }
-}
-
-/**
- * 获取回合状态文本
- * @param {object} gameState - 游戏状态
- * @param {string} myRole - 我的角色
- * @returns {string} 回合状态文本
- */
-export function getRoundStatusText(gameState, myRole) {
-  if (!gameState.progress || !gameState.config) return '';
-  
-  const { gameStatus } = gameState.config;
-  const { currentPlayer } = gameState.progress;
-  
-  if (gameStatus !== 'playing') return '';
-  
-  const myState = myRole === 'creator' ? gameState.creator : gameState.joiner;
-  const opponentRole = getOpponentRole(myRole);
-  const opponentState = opponentRole === 'creator' ? gameState.creator : gameState.joiner;
-  
-  // 获取对手名字
-  const opponentName = opponentRole === 'creator' 
-    ? gameState.players?.creator?.account || '对方'
-    : gameState.players?.joiner?.account || '对方';
-
-  // 双方都停手
-  if (myState?.passed && opponentState?.passed) {
-    return '游戏即将结束';
-  }
-  
-  // 我停手了
-  if (myState?.passed) {
-    return `我已停手，等待 ${opponentName}`;
-  }
-  
-  // 对方停手了
-  if (opponentState?.passed) {
-    return `${opponentName} 已停手`;
-  }
-  
-  // 正常回合
-  return currentPlayer === myRole ? '我的回合' : `${opponentName} 的回合`;
-}
-
-/**
  * 计算按钮可用状态
  * @param {object} gameState - 游戏状态
  * @param {string} myRole - 我的角色
@@ -317,45 +192,6 @@ export function calculateButtonStates(gameState, myPlayerId, selectedPiece, tria
 }
 
 /**
- * 获取棋盘格子的颜色类名
- * @param {number} cellValue - 格子值 (0=空, 1=创建者, 2=加入者)
- * @param {boolean} isLatest - 是否是最新一步
- * @param {boolean} isTrial - 是否是试下
- * @param {string} playerRole - 格子所属玩家角色
- * @returns {string} Tailwind类名
- */
-export function getCellColorClass(cellValue, isLatest, isTrial, playerRole) {
-  if (isTrial) {
-    // 试下状态
-    return playerRole === 'creator' ? 'bg-[#FFB8C2]' : 'bg-[#B8CCFF]';
-  }
-  
-  if (cellValue === 1) {
-    // 创建者的棋子
-    return isLatest ? 'bg-[#FF4D66]' : 'bg-[#FF8294]';
-  }
-  
-  if (cellValue === 2) {
-    // 加入者的棋子
-    return isLatest ? 'bg-[#4D80FF]' : 'bg-[#82A6FF]';
-  }
-  
-  // 空格子
-  return 'bg-white hover:bg-gray-50';
-}
-
-/**
- * 验证游戏结束条件
- * @param {object} gameState - 游戏状态
- * @returns {boolean} 是否应该结束
- */
-export function shouldGameEnd(gameState) {
-  if (!gameState.creator || !gameState.joiner) return false;
-  
-  return gameState.creator.passed && gameState.joiner.passed;
-}
-
-/**
  * 获取可用棋子列表
  * @param {array} piecesUsed - 已使用棋子数组
  * @returns {array} 可用棋子ID列表
@@ -403,44 +239,4 @@ export function formatRoomId(roomId) {
   }
   
   return roomId;
-}
-
-/**
- * 检查是否可以继续下棋（还有合法位置）
- * @param {array} board - 棋盘
- * @param {array} piecesUsed - 已使用棋子
- * @param {string} role - 角色
- * @param {object} playerState - 玩家状态
- * @returns {boolean} 是否还能下棋
- */
-export function canContinuePlaying(board, piecesUsed, role, playerState) {
-  if (!piecesUsed || !board) return false;
-  
-  // 获取可用棋子
-  const availablePieces = getAvailablePieces(piecesUsed);
-  if (availablePieces.length === 0) return false;
-  
-  const playerId = getPlayerId(role);
-  const firstMove = isFirstMove(playerState);
-  
-  // 简单检查：遍历部分棋子和位置
-  // 完整检查太耗时，这里只做快速判断
-  for (let pieceId of availablePieces.slice(0, 5)) {
-    for (let rotation = 0; rotation < 4; rotation++) {
-      const shape = getPieceTransforms(pieceId, rotation, false);
-      
-      // 只检查部分位置
-      for (let y = 0; y < 14; y += 2) {
-        for (let x = 0; x < 14; x += 2) {
-          if (!isOutOfBounds(shape, x, y) &&
-              !isOverlapping(shape, x, y, board) &&
-              isValidPlacement(shape, x, y, board, playerId, firstMove)) {
-            return true;
-          }
-        }
-      }
-    }
-  }
-  
-  return false;
 }

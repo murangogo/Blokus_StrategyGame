@@ -208,7 +208,7 @@ function HistoryDetail() {
 
   // 获取胜者文本
   const getWinnerText = () => {
-    if (game.winner === 'draw') return '平局';
+    if (game.winner === 'draw') return '';  // 已有平局二字，不再显示
     if (!game.winner) return '未知';
     return game.winnerAccount || '未知玩家';
   };
