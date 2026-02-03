@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://gameapi.azuki.top'  
+  ? 'https://gameapi2.azuki.top'  
   : 'http://127.0.0.1:8787';      
 
 // 创建axios实例
@@ -82,7 +82,7 @@ export function createGameWebSocket(roomId, onMessage) {
   }
 
   // 不再传递明文的userId，而是传递token
-  const wsUrl = `${import.meta.env.PROD ? 'wss' : 'ws'}://${import.meta.env.PROD ? 'gameapi.azuki.top' : '127.0.0.1:8787'}/game/connect/${roomId}?token=${token}`;
+  const wsUrl = `${import.meta.env.PROD ? 'wss' : 'ws'}://${import.meta.env.PROD ? 'gameapi2.azuki.top' : '127.0.0.1:8787'}/game/connect/${roomId}?token=${token}`;
   
   const ws = new WebSocket(wsUrl);
   
