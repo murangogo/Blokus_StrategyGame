@@ -261,6 +261,12 @@ export function useGameRoom(roomId) {
           break;
         }
 
+        case 'room_expired': {
+          // 房间长时间无操作被服务端回收，随后连接会以 1000 正常关闭（不触发重连）
+          setError(data.message || '房间已过期');
+          break;
+        }
+
         case 'pong': {
           lastPongTimeRef.current = Date.now();
           break;

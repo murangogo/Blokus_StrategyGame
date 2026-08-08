@@ -45,6 +45,7 @@ function Room() {
   const gameStatus = gameState.config?.gameStatus;
   const isMyTurn = gameState.progress?.currentPlayer === myPlayerId;
   const boardSize = gameState.config?.boardSize || 14;
+  const playerCount = gameState.config?.playerCount || 2;
   const boardArray = gameState.board?.board || gameState.board;
 
   // === 计时器 ===
@@ -335,6 +336,7 @@ function Room() {
               trialPosition={trialPosition}
               myColor={myColor}
               boardSize={boardSize}
+              playerCount={playerCount}
               onCellClick={handleBoardClick}
               disabled={!isMyTurn || gameStatus !== 'playing'}
               selectedPiece={selectedPiece}

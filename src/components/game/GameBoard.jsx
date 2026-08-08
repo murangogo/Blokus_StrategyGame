@@ -15,6 +15,7 @@ const COLOR_VARS = {
   '--player-color-4-bright': '#FF9D4D',
 };
 
+// 顺序与 colorId 1~4 一一对应（p1 红、p2 蓝、p3 绿、p4 橙）
 const LEGEND = [
   { color: '#FF8294', label: '红' },
   { color: '#82A6FF', label: '蓝' },
@@ -38,6 +39,7 @@ function GameBoard({
   trialPosition, // 试下位置 {x, y, shape}
   myColor, // 我的颜色对象
   boardSize = 14, // 棋盘大小 (14/17/20)
+  playerCount = 4, // 本局人数，决定图例显示几种颜色
   onCellClick, // 点击格子回调
   disabled = false, // 是否禁用
   selectedPiece, // 选中的棋子
@@ -138,7 +140,7 @@ function GameBoard({
           棋盘 ({boardSize}×{boardSize})
         </h3>
         <div className="flex items-center gap-4 text-xs">
-          {LEGEND.map(({ color, label }) => (
+          {LEGEND.slice(0, playerCount).map(({ color, label }) => (
             <div key={label} className="flex items-center gap-2">
               <div className="w-3 h-3 rounded" style={{ backgroundColor: color }}></div>
               <span className="text-gray-600">{label}</span>
