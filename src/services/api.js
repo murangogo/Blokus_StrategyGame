@@ -20,13 +20,15 @@ class ApiError extends Error {
 }
 
 // token 失效时清理本地状态并回到登录页
+// （正常情况下路由守卫已提前拦下过期 token，这里兜住"exp 未到但签名已失效"等场景）
 function handleUnauthorized() {
   const hasToken = localStorage.getItem('token');
   // 登录页自身的 401 交给 Login 组件展示，不做跳转
   if (hasToken && window.location.pathname !== '/login') {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    sessionStorage.removeItem('authChecked');
+    window.location.href = '/login?expired=1';
   }
 }
 

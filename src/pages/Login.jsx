@@ -1,17 +1,32 @@
 // 路径: src/pages/Login.jsx
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { setToken, setUser } from '../utils/auth';
+import { setToken, setUser, logout, isTokenValid } from '../utils/auth';
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     account: '',
     password: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 被路由守卫踢回来（state.expired），或被 401 拦截器整页跳转回来（?expired=1）
+  const isExpired =
+    location.state?.expired === true ||
+    new URLSearchParams(location.search).get('expired') === '1';
+
+  // 清掉已失效的登录态，避免过期 token 一直留在 localStorage 里。
+  // 仍然有效的登录态不动，以免用户手动访问 /login 时被无故登出。
+  useEffect(() => {
+    if (!isTokenValid()) {
+      logout();
+      sessionStorage.removeItem('authChecked');
+    }
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -70,6 +85,26 @@ function Login() {
           </h1>
           <p className="text-gray-500 text-sm">欢迎回来，请登录您的账号</p>
         </div>
+
+        {/* 登录状态失效提示 */}
+        {isExpired && (
+          <div className="mb-6 flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg text-sm">
+            <svg
+              className="w-5 h-5 flex-shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>登录状态已过期，请重新登录。</span>
+          </div>
+        )}
 
         {/* 登录表单 */}
         <form onSubmit={handleSubmit} className="space-y-6">
