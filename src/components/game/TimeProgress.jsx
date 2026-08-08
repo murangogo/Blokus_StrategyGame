@@ -16,19 +16,11 @@ function TimeProgress({
   gameConfig,        // 新增: 游戏配置
   players            // 新增: 玩家列表
 }) {
-  // 根据警告等级决定动画效果
-  const getProgressAnimation = () => {
-    if (!isMyTurn) return '';
-    
-    if (warningLevel === 'critical') {
-      return 'animate-pulse';
-    } else if (warningLevel === 'danger') {
-      return 'animate-pulse';
-    } else if (warningLevel === 'warning') {
-      return '';
-    }
-    return '';
-  };
+  // 时间紧张时进度条闪烁提示
+  const progressAnimation =
+    isMyTurn && (warningLevel === 'critical' || warningLevel === 'danger')
+      ? 'animate-pulse'
+      : '';
 
   // 根据游戏状态决定按钮文字
   const getButtonText = () => {
@@ -95,7 +87,7 @@ function TimeProgress({
             className={`
               absolute left-0 top-0 h-full bg-red-500
               transition-all duration-300 ease-linear
-              ${getProgressAnimation()}
+              ${progressAnimation}
             `}
             style={{ width: `${limitProgress}%` }}
           />
@@ -129,7 +121,7 @@ function TimeProgress({
             className={`
               absolute left-0 top-0 h-full bg-yellow-500
               transition-all duration-300 ease-linear
-              ${usingBackup && isMyTurn ? getProgressAnimation() : ''}
+              ${usingBackup && isMyTurn ? progressAnimation : ''}
             `}
             style={{ width: `${backupProgress}%` }}
           />

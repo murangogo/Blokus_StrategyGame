@@ -1,12 +1,14 @@
 // 路径：src/components/game/GameStatus.jsx
+import { memo } from 'react';
 import { countPlayerSquares } from '../../utils/pieces';
+import { getPlayerColorId } from '../../utils/gameHelpers';
 
 function GameStatus({ gameState, myPlayerId, myState }) {
   // 获取我的颜色ID
-  const myColorId = myState?.colorId || parseInt(myPlayerId.substring(1));
+  const myColorId = myState?.colorId || getPlayerColorId(myPlayerId);
 
   // 计算我的棋盘格数
-  const mySquares = myState && gameState.board 
+  const mySquares = myState && gameState.board
     ? countPlayerSquares(gameState.board.board || gameState.board, myColorId)
     : 0;
 
@@ -19,38 +21,33 @@ function GameStatus({ gameState, myPlayerId, myState }) {
   // 游戏状态文本
   const getGameStatusText = () => {
     if (!gameState.config) return '加载中...';
-    
-    const { gameStatus, playerCount = 0, requiredPlayerCount = 2, hasEnoughPlayers = false } = gameState.config;
-    
+
+    const { gameStatus, requiredPlayerCount = 2 } = gameState.config;
+
     // 获取已加入玩家数量
-    const joinedPlayers = gameState.players?.filter(p => p !== null).length || 0;
-    
+    const joinedPlayers = gameState.players?.filter(Boolean).length || 0;
+
     switch (gameStatus) {
       case 'waiting':
-        if (myPlayerId === 'p1') { // 创建者
-          return hasEnoughPlayers || joinedPlayers >= requiredPlayerCount
-            ? '等待开始游戏'
-            : `等待其他玩家加入 (${joinedPlayers}/${requiredPlayerCount})`;
-        } else {
-          return '等待房主开始游戏';
-        }
-        
+        if (myPlayerId !== 'p1') return '等待房主开始游戏';
+        return joinedPlayers >= requiredPlayerCount
+          ? '等待开始游戏'
+          : `等待其他玩家加入 (${joinedPlayers}/${requiredPlayerCount})`;
+
       case 'playing':
         return '游戏进行中';
-        
-      case 'finished':
+
+      case 'finished': {
         const { winner } = gameState;
         if (!winner) return '游戏结束';
-        
-        if (winner === 'draw') {
-          return '平局';
-        }
-        
+        if (winner === 'draw') return '平局';
+
         // 获取赢家名字
-        const winnerIndex = parseInt(winner.substring(1)) - 1;
-        const winnerName = gameState.players[winnerIndex]?.account || '未知玩家';
+        const winnerName =
+          gameState.players[getPlayerColorId(winner) - 1]?.account || '未知玩家';
         return `${winnerName} 胜利`;
-      
+      }
+
       default:
         return '未知状态';
     }
@@ -164,4 +161,5 @@ function GameStatus({ gameState, myPlayerId, myState }) {
   );
 }
 
-export default GameStatus;
+// 计时器每 200ms 会触发父组件重渲染，这里 memo 掉与计时无关的重算
+export default memo(GameStatus);

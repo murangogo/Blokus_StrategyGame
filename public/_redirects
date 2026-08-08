@@ -1,0 +1,3 @@
+# SPA 回退：BrowserRouter 的深链接（如 /room/yht123、/history/5）
+# 直接访问或刷新时交给 index.html 处理，否则会 404。
+/*    /index.html   200

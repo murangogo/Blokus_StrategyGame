@@ -51,9 +51,6 @@ function Home() {
       
       if (response.data.success) {
         const roomId = response.data.data.roomId_create;
-        console.log(response);
-        console.log(roomId);
-
         setCreatedRoomId(roomId);
         setCreateModalOpen(false);
         setResultModalOpen(true);

@@ -1,105 +1,112 @@
 // 路径：src/services/api.js
-import axios from 'axios';
+const API_BASE_URL = import.meta.env.PROD
+  ? 'https://gameapi.azuki.top'
+  : 'http://127.0.0.1:8787';
 
-const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://gameapi.azuki.top'  
-  : 'http://127.0.0.1:8787';      
+const WS_BASE_URL = import.meta.env.PROD
+  ? 'wss://gameapi.azuki.top'
+  : 'ws://127.0.0.1:8787';
 
-// 创建axios实例
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
+/**
+ * 请求失败时抛出的错误。
+ * 保留 `response: { status, data }` 结构，调用方可继续用 err.response?.data?.error 取错误信息。
+ */
+class ApiError extends Error {
+  constructor(message, response) {
+    super(message);
+    this.name = 'ApiError';
+    this.response = response;
   }
-});
+}
 
-// 请求拦截器（添加token）
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// 响应拦截器（处理错误）
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      const currentPath = window.location.pathname;
-      const hasToken = localStorage.getItem('token');
-      
-      // ✅ 只有token过期且不在登录页才跳转
-      if (hasToken && currentPath !== '/login') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-      // ✅ 登录页的401错误直接返回，让Login组件处理
-    }
-    return Promise.reject(error);
+// token 失效时清理本地状态并回到登录页
+function handleUnauthorized() {
+  const hasToken = localStorage.getItem('token');
+  // 登录页自身的 401 交给 Login 组件展示，不做跳转
+  if (hasToken && window.location.pathname !== '/login') {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   }
-);
+}
+
+async function request(path, { method = 'GET', body } = {}) {
+  const headers = {};
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const token = localStorage.getItem('token');
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    // 网络层面的失败（断网、DNS、CORS 等），没有 response
+    throw new ApiError(err.message || 'Network error');
+  }
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    if (res.status === 401) handleUnauthorized();
+    throw new ApiError(data?.error || res.statusText, { status: res.status, data });
+  }
+
+  return { data };
+}
 
 // API方法
 export const authAPI = {
-  login: (account, password) => 
-    api.post('/auth/login', { account, password }),
-  verify: () => 
-    api.post('/auth/verify')
+  login: (account, password) =>
+    request('/auth/login', { method: 'POST', body: { account, password } }),
+  verify: () =>
+    request('/auth/verify', { method: 'POST' }),
 };
 
 export const gameAPI = {
-  // 更新createRoom方法以支持多人游戏参数
-  createRoom: (limitTime, backupTime, playerCount, boardSize) => 
-    api.post('/game/create', { limitTime, backupTime, playerCount, boardSize }),
-  joinRoom: (roomId) => 
-    api.post(`/game/join/${roomId}`),
-  getState: (roomId) => 
-    api.get(`/game/state/${roomId}`),
-  startGame: (roomId) => 
-    api.post(`/game/start/${roomId}`)
+  createRoom: (limitTime, backupTime, playerCount, boardSize) =>
+    request('/game/create', {
+      method: 'POST',
+      body: { limitTime, backupTime, playerCount, boardSize },
+    }),
+  joinRoom: (roomId) =>
+    request(`/game/join/${encodeURIComponent(roomId)}`, { method: 'POST' }),
+  getState: (roomId) =>
+    request(`/game/state/${encodeURIComponent(roomId)}`),
+  startGame: (roomId) =>
+    request(`/game/start/${encodeURIComponent(roomId)}`, { method: 'POST' }),
 };
 
 export const historyAPI = {
-  getList: (page = 1, size = 15) => 
-    api.get(`/history/list?page=${page}&size=${size}`),
-  getDetail: (historyId) => 
-    api.get(`/history/${historyId}`)
+  getList: (page = 1, size = 15) =>
+    request(`/history/list?page=${page}&size=${size}`),
+  getDetail: (historyId) =>
+    request(`/history/${encodeURIComponent(historyId)}`),
 };
 
-// WebSocket连接函数（带token）
+// WebSocket连接函数（token通过查询参数传递，后端 wsAuthMiddleware 校验）
 export function createGameWebSocket(roomId, onMessage) {
   const token = localStorage.getItem('token');
 
   if (!token) {
-    console.error("无法建立WebSocket连接：找不到token");
-    return null; 
+    console.error('无法建立WebSocket连接：找不到token');
+    return null;
   }
 
-  // 不再传递明文的userId，而是传递token
-  const wsUrl = `${import.meta.env.PROD ? 'wss' : 'ws'}://${import.meta.env.PROD ? 'gameapi.azuki.top' : '127.0.0.1:8787'}/game/connect/${roomId}?token=${token}`;
-  
+  const wsUrl = `${WS_BASE_URL}/game/connect/${encodeURIComponent(roomId)}?token=${encodeURIComponent(token)}`;
   const ws = new WebSocket(wsUrl);
-  
+
   ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    onMessage(data);
+    try {
+      onMessage(JSON.parse(event.data));
+    } catch (err) {
+      console.error('WebSocket 消息解析失败:', err);
+    }
   };
-  
-  ws.onerror = (error) => {
-    console.error("WebSocket 发生错误:", error);
-  };
-  
-  ws.onclose = (event) => {
-    console.log("WebSocket 连接已关闭:", event.code, event.reason);
-  };
-  
+
   return ws;
 }
-
-export default api;

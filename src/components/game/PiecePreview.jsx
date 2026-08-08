@@ -1,6 +1,6 @@
 // 路径：src/components/game/PiecePreview.jsx
-import { getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
-import { PIECES } from '../../utils/pieces';
+import { memo } from 'react';
+import { PIECES, getPieceTransforms, calculatePieceOffset } from '../../utils/pieces';
 
 function PiecePreview({ 
   pieceId,      // 选中的棋子ID
@@ -129,4 +129,4 @@ function PiecePreview({
   );
 }
 
-export default PiecePreview;
+export default memo(PiecePreview);

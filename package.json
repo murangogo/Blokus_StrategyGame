@@ -1,16 +1,17 @@
 {
   "name": "blokus-strategygame",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "角斗士棋 Blokus - 2~4人在线对战棋类游戏前端（React + Vite + Tailwind）",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
-    "axios": "^1.12.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.2"
@@ -27,19 +28,24 @@
     "globals": "^16.4.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "wrangler": "^4.45.4"
   },
-  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
-  "main": "eslint.config.js",
+  "engines": {
+    "node": ">=20.19"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/murangogo/Blokus_StrategyGame.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/murangogo/Blokus_StrategyGame/issues"
   },
-  "homepage": "https://github.com/murangogo/Blokus_StrategyGame#readme"
+  "homepage": "https://github.com/murangogo/Blokus_StrategyGame#readme",
+  "license": "ISC",
+  "allowScripts": {
+    "fsevents@2.3.3": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20260801.1": true
+  }
 }

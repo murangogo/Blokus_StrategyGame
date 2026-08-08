@@ -1,7 +1,7 @@
-// src/components/game/GameResultModal.jsx
+// 路径：src/components/game/GameResultModal.jsx
 import Modal from '../Modal';
 
-function GameResultModal({ isOpen, onClose, result, myPlayerId, winner, players }) {
+function GameResultModal({ isOpen, onClose, result, winner, players }) {
   // 获取鼓励性文字
   const getRandomMessage = () => {
     if (result === 'win') {

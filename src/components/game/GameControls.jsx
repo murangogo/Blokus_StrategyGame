@@ -1,5 +1,7 @@
 // 路径：src/components/game/GameControls.jsx
-function GameControls({ 
+import { memo } from 'react';
+
+function GameControls({
   buttonStates,      // 按钮状态对象
   onConfirmMove,     // 确定下棋
   onRotate,          // 旋转
@@ -126,4 +128,4 @@ function GameControls({
   );
 }
 
-export default GameControls;
+export default memo(GameControls);

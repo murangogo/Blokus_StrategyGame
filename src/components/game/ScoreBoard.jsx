@@ -1,6 +1,4 @@
-// src/components/game/ScoreBoard.jsx
-import React from 'react';
-
+// 路径：src/components/game/ScoreBoard.jsx
 function ScoreBoard({ players, scores, penalties, colors }) {
   // 确保所有参数都存在，添加防御性编程
   if (!players || !scores || !colors) {

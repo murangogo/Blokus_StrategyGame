@@ -1,30 +1,29 @@
 // 路径：src/pages/History.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { historyAPI } from '../services/api';
+import { formatDate, formatDuration } from '../utils/format';
+import PageLoader from '../components/PageLoader';
+
+const PAGE_SIZE = 15; // 与后端默认每页条数保持一致
 
 function History() {
   const navigate = useNavigate();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
-  const [pageSize] = useState(15); // 使用后端默认的每页15条
 
-  // 获取历史记录（添加页码参数）
-  useEffect(() => {
-    fetchHistory(currentPage);
-  }, [currentPage]); // 当页码变化时重新获取数据
-
-  const fetchHistory = async (page) => {
+  const fetchHistory = useCallback(async (page) => {
     try {
       setLoading(true);
-      const response = await historyAPI.getList(page, pageSize);
-      
+      setError(null);
+      const response = await historyAPI.getList(page, PAGE_SIZE);
+
       if (response.data.success) {
         const { total, games, totalPages } = response.data.data;
         setGames(games);
@@ -39,33 +38,12 @@ function History() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // 格式化日期
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    return `${year}年${month}月${day}日`;
-  };
-
-  // 格式化游戏时长
-  const formatDuration = (seconds) => {
-    if (!seconds) return '未知';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}小时${minutes}分钟${secs}秒`;
-    } else if (minutes > 0) {
-      return `${minutes}分钟${secs}秒`;
-    } else {
-      return `${secs}秒`;
-    }
-  };
+  // 页码变化时重新获取数据
+  useEffect(() => {
+    fetchHistory(currentPage);
+  }, [currentPage, fetchHistory]);
 
   // 页面导航
   const goToPage = (page) => {
@@ -77,17 +55,7 @@ function History() {
 
   // 加载状态
   if (loading && games.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mx-auto mb-4">
-            <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-          </div>
-          <p className="text-gray-600 font-medium">加载历史记录中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader title="加载历史记录中..." />;
   }
 
   // 错误状态
